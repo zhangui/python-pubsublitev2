@@ -128,15 +128,30 @@ class MSAKPublisherTransport(PublisherTransport):
             else:
                 credentials, _ = default()
             
+            # Apply required scopes for MSAK
+            if hasattr(credentials, 'with_scopes'):
+                credentials = credentials.with_scopes([
+                    'https://www.googleapis.com/auth/cloud-platform'
+                ])
+            
             if not credentials.valid:
                 request = Request()
                 credentials.refresh(request)
             
-            # Return token in the format expected by confluent-kafka
-            return credentials.token, time.time() + 3600  # Token expires in 1 hour
+            # Get actual token expiry if available
+            if hasattr(credentials, 'expiry') and credentials.expiry:
+                expiry_time = credentials.expiry.timestamp()
+            else:
+                expiry_time = time.time() + 3600  # Default 1 hour
+            
+            # Return token and expiry as expected by confluent-kafka
+            logger.debug(f"OAuth token refreshed, expires at: {expiry_time}")
+            return credentials.token, expiry_time
+            
         except Exception as e:
             logger.error(f"OAuth callback failed: {e}")
-            logger.error("Please authenticate with: gcloud auth application-default login")
+            logger.error("Please ensure you have the required MSAK permissions:")
+            logger.error("  gcloud auth application-default login --scopes=https://www.googleapis.com/auth/cloud-platform")
             return None, 0
     
     def _start_batch_processor(self) -> None:
