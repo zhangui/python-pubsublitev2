@@ -47,7 +47,7 @@ def test_sasl_connection():
     
     # Test with hostname (most likely to work)
     config = {
-        'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-dolphin-dev.cloud.goog:9092',
+        'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092',
         'security.protocol': 'SASL_SSL',
         'sasl.mechanism': 'OAUTHBEARER',
         'oauth_cb': oauth_cb,

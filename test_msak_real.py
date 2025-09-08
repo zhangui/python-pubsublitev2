@@ -12,7 +12,7 @@ def main():
     
     # Configure your cluster
     msak_config = MSAKConfig(
-        project_id='ygnahz-dolphin-dev',
+        project_id='ygnahz-eg-codelab',
         location='us-central1',
         cluster_id='testpsl'
     )

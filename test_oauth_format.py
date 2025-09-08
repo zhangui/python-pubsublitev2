@@ -53,7 +53,7 @@ def test_oauth_formats():
     """Test different OAuth return formats."""
     
     base_config = {
-        'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-dolphin-dev.cloud.goog:9092',
+        'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092',
         'security.protocol': 'SASL_SSL',
         'sasl.mechanism': 'OAUTHBEARER',
         'client.id': 'oauth-format-test',

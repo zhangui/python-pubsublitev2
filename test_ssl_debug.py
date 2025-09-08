@@ -34,7 +34,7 @@ def test_ssl_configs():
         # Config 1: Hostname with strict SSL
         {
             'name': 'Hostname with strict SSL',
-            'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-dolphin-dev.cloud.goog:9092',
+            'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092',
             'security.protocol': 'SASL_SSL',
             'sasl.mechanism': 'OAUTHBEARER',
             'oauth_cb': oauth_cb,
@@ -42,7 +42,7 @@ def test_ssl_configs():
         # Config 2: Hostname with relaxed SSL
         {
             'name': 'Hostname with relaxed SSL',
-            'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-dolphin-dev.cloud.goog:9092',
+            'bootstrap.servers': 'bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092',
             'security.protocol': 'SASL_SSL',
             'sasl.mechanism': 'OAUTHBEARER',
             'oauth_cb': oauth_cb,

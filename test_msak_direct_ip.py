@@ -11,7 +11,7 @@ def test_dns_resolution():
     import subprocess
     
     print("=== DNS Resolution Tests ===")
-    hostname = "bootstrap.testpsl.us-central1.managedkafka.ygnahz-dolphin-dev.cloud.goog"
+    hostname = "bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog"
     
     # Test nslookup
     print(f"1. Testing nslookup for {hostname}")
@@ -58,7 +58,7 @@ def test_msak_direct_ip():
         
         # Use direct IP instead of hostname
         msak_config = MSAKConfig(
-            project_id='ygnahz-dolphin-dev',
+            project_id='ygnahz-eg-codelab',
             location='us-central1',
             cluster_id='testpsl',
             endpoint_override='10.128.0.26:9092'  # Direct bootstrap IP
@@ -124,7 +124,7 @@ def test_msak_hostname():
         
         # Use original hostname
         msak_config = MSAKConfig(
-            project_id='ygnahz-dolphin-dev',
+            project_id='ygnahz-eg-codelab',
             location='us-central1',
             cluster_id='testpsl'
             # No endpoint_override - use default hostname

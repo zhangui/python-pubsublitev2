@@ -15,10 +15,10 @@ def main():
     
     # Use the exact bootstrap server from your gcloud command
     msak_config = MSAKConfig(
-        project_id='ygnahz-dolphin-dev',
+        project_id='ygnahz-eg-codelab',
         location='us-central1',
         cluster_id='testpsl',
-        endpoint_override='bootstrap.testpsl.us-central1.managedkafka.ygnahz-dolphin-dev.cloud.goog:9092'
+        endpoint_override='bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092'
     )
     
     topic_name = 'testtopic'

@@ -4,7 +4,7 @@
 
 echo "=== MSAK Connectivity Diagnostic ==="
 
-HOSTNAME="bootstrap.testpsl.us-central1.managedkafka.ygnahz-dolphin-dev.cloud.goog"
+HOSTNAME="bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog"
 INTERNAL_IP="10.128.0.26"
 
 echo "1. DNS Resolution Test:"
