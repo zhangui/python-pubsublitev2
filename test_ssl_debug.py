@@ -43,8 +43,8 @@ def test_ssl_configs():
             'security.protocol': 'SASL_SSL',
             'sasl.mechanism': 'OAUTHBEARER',
             'oauth_cb': oauth_cb,
-            'ssl.check.hostname': 'false',
             'ssl.endpoint.identification.algorithm': 'none',
+            'ssl.ca.location': 'probe',
         },
         # Config 3: IP with relaxed SSL  
         {
@@ -53,8 +53,8 @@ def test_ssl_configs():
             'security.protocol': 'SASL_SSL',
             'sasl.mechanism': 'OAUTHBEARER',
             'oauth_cb': oauth_cb,
-            'ssl.check.hostname': 'false',
             'ssl.endpoint.identification.algorithm': 'none',
+            'ssl.ca.location': 'probe',
         },
     ]
     

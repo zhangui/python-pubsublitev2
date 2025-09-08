@@ -108,10 +108,9 @@ class MSAKPublisherTransport(PublisherTransport):
             'retries': 5,
             'max.in.flight.requests.per.connection': 1,
             'enable.idempotence': True,
-            # SSL configuration for MSAK internal IP connections
-            'ssl.check.hostname': 'false',
+            # SSL configuration for MSAK connections
             'ssl.endpoint.identification.algorithm': 'none',
-            'ssl.ca.location': '/etc/ssl/certs/ca-certificates.crt',
+            'ssl.ca.location': 'probe',
         }
         
         # Apply batch settings to producer config
