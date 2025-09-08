@@ -33,12 +33,20 @@ export PATH=$PATH:$KAFKA_HOME/bin
 
 # Download Google MSAK authentication library
 echo "📥 Downloading MSAK authentication library..."
-wget -O release-and-dependencies.zip https://github.com/googleapis/managedkafka/releases/download/v1.0.5/release-and-dependencies.zip
+if [ ! -f "release-and-dependencies.zip" ]; then
+    wget -O release-and-dependencies.zip https://github.com/googleapis/managedkafka/releases/download/v1.0.5/release-and-dependencies.zip
+fi
 unzip -o release-and-dependencies.zip
 
 # Copy authentication libraries to Kafka lib directory
 echo "📁 Installing authentication libraries..."
-cp -r release-and-dependencies/* $KAFKA_HOME/libs/
+cp -v release-and-dependencies/*.jar $KAFKA_HOME/libs/ 2>/dev/null || true
+cp -v release-and-dependencies/dependency/*.jar $KAFKA_HOME/libs/ 2>/dev/null || true
+
+# List what we actually copied
+echo "🔍 Authentication JARs installed:"
+ls -la $KAFKA_HOME/libs/*google* $KAFKA_HOME/libs/*managed* 2>/dev/null || echo "   No Google/managed JARs found yet"
+ls -la $KAFKA_HOME/libs/*auth* 2>/dev/null || echo "   No auth JARs found yet"
 
 # Update classpath - include all Kafka libs and dependencies
 export CLASSPATH=$CLASSPATH:$KAFKA_HOME/libs/*:$KAFKA_HOME/libs/release-and-dependencies/*:$KAFKA_HOME/libs/release-and-dependencies/dependency/*
@@ -75,10 +83,16 @@ else
     wget -P $KAFKA_HOME/libs/ https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.15.2/jackson-core-2.15.2.jar
 fi
 
-if find $KAFKA_HOME/libs -name "*google*cloud*kafka*.jar" | grep -q .; then
-    echo "   ✅ Google Cloud Kafka auth found"
+# Check for various possible auth JAR names
+if find $KAFKA_HOME/libs -name "*google*kafka*.jar" -o -name "*managedkafka*.jar" -o -name "*gcp*.jar" | grep -q .; then
+    echo "   ✅ Google Cloud Kafka auth found:"
+    find $KAFKA_HOME/libs -name "*google*kafka*.jar" -o -name "*managedkafka*.jar" -o -name "*gcp*.jar" | head -3
 else
     echo "   ❌ Google Cloud Kafka auth missing"
+    echo "   📂 Contents of release-and-dependencies:"
+    ls -la release-and-dependencies/ 2>/dev/null || echo "   Directory not found"
+    echo "   📂 All JARs in Kafka libs:"
+    ls -la $KAFKA_HOME/libs/*.jar | head -10
 fi
 
 echo ""
