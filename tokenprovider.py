@@ -63,23 +63,12 @@ class TokenProvider(object):
                 expiry_timestamp = time.time() + 3600
                 print("   ⏰ No expiry info, defaulting to +1 hour")
             
-            # Create the JWT-style token that MSAK expects
-            payload = json.dumps({
-                'iss': self.credentials.service_account_email if hasattr(self.credentials, 'service_account_email') else 'unknown',
-                'sub': self.credentials.service_account_email if hasattr(self.credentials, 'service_account_email') else 'unknown',
-                'aud': 'kafka',
-                'iat': int(time.time()),
-                'exp': int(expiry_timestamp),
-                'access_token': token
-            })
+            # Return the raw Google Cloud access token directly
+            # This matches what GcpLoginCallbackHandler does in Java
+            print(f"   ✅ Returning raw access token (length: {len(token)})")
+            print(f"   🔤 Token prefix: {token[:50]}...")
             
-            # Encode as JWT-style token (header.payload.signature)
-            jwt_token = f"{encode(self.HEADER)}.{encode(payload)}.{encode('GOOG_OAUTH2_TOKEN')}"
-            
-            print(f"   ✅ JWT token created (length: {len(jwt_token)})")
-            print(f"   🔤 Token prefix: {jwt_token[:100]}...")
-            
-            return jwt_token, expiry_timestamp
+            return token, expiry_timestamp
             
         except Exception as e:
             print(f"   💥 Token provider error: {e}")
