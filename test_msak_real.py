@@ -14,7 +14,8 @@ def main():
     msak_config = MSAKConfig(
         project_id='ygnahz-dolphin-dev',
         location='us-central1',
-        cluster_id='testpsl'
+        cluster_id='testpsl',
+        endpoint_override='10.128.0.26:9092'  # Direct IP bypass
     )
     
     topic_name = 'testtopic'
