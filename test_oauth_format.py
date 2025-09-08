@@ -25,7 +25,7 @@ def oauth_cb_basic(config):
         return credentials.token, expiry
     except Exception as e:
         print(f"OAuth error: {e}")
-        return None, 0
+        return "", 0
 
 def oauth_cb_extended(config):
     """Extended OAuth callback - returns (token, expiry, principal, extensions)"""
@@ -47,7 +47,7 @@ def oauth_cb_extended(config):
         return credentials.token, expiry, principal, extensions
     except Exception as e:
         print(f"OAuth error: {e}")
-        return None, 0
+        return "", 0
 
 def test_oauth_formats():
     """Test different OAuth return formats."""

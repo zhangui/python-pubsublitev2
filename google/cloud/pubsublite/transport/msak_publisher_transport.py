@@ -156,7 +156,8 @@ class MSAKPublisherTransport(PublisherTransport):
             logger.error(f"OAuth callback failed: {e}")
             logger.error("Please ensure you have the required MSAK permissions:")
             logger.error("  gcloud auth application-default login --scopes=https://www.googleapis.com/auth/cloud-platform")
-            return None, 0
+            # Return empty string instead of None to avoid tuple format error
+            return "", 0
     
     def _start_batch_processor(self) -> None:
         """Start background thread for batch processing."""

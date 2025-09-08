@@ -38,7 +38,7 @@ def oauth_cb(config):
         print(f"OAuth callback failed: {e}")
         import traceback
         traceback.print_exc()
-        return None, 0
+        return "", 0
 
 def test_sasl_connection():
     """Test actual SASL OAUTHBEARER connection."""
