@@ -40,8 +40,19 @@ if curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeM
     
     # Try to get network info step by step
     echo "Getting network info..."
+    
+    # Test each endpoint individually
+    echo "Testing network endpoint..."
     VM_NETWORK=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/network 2>/dev/null)
+    echo "Network result: '$VM_NETWORK'"
+    
+    echo "Testing subnetwork endpoint..."  
     VM_SUBNET_FULL=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/subnetwork 2>/dev/null)
+    echo "Subnetwork result: '$VM_SUBNET_FULL'"
+    
+    # Check if subnetwork endpoint exists at all
+    SUBNET_HTTP_CODE=$(curl -w "%{http_code}" -s -o /dev/null -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/subnetwork)
+    echo "Subnetwork HTTP code: $SUBNET_HTTP_CODE"
     
     if [ -n "$VM_SUBNET_FULL" ]; then
         VM_SUBNET=$(basename "$VM_SUBNET_FULL")
