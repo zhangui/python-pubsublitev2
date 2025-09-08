@@ -60,20 +60,28 @@ if curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeM
         echo "VM Subnet: $VM_SUBNET"
         echo "VM Subnet Full Path: $VM_SUBNET_FULL"
     else
-        echo "❌ Could not get subnetwork from metadata"
+        echo "⚠️  Subnetwork not available from metadata (likely auto-mode network)"
         echo "VM Network: $(basename "$VM_NETWORK")"
         
-        # Fallback: try gcloud method
-        VM_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name 2>/dev/null)
-        VM_ZONE=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/zone 2>/dev/null | cut -d/ -f4)
-        
-        if [ -n "$VM_NAME" ] && [ -n "$VM_ZONE" ]; then
-            echo "Trying gcloud method with VM: $VM_NAME in zone: $VM_ZONE"
-            VM_SUBNET_FULL=$(gcloud compute instances describe "$VM_NAME" --zone="$VM_ZONE" --format="value(networkInterfaces[0].subnetwork)" 2>/dev/null)
-            VM_SUBNET=$(basename "$VM_SUBNET_FULL")
-            echo "VM Subnet (via gcloud): $VM_SUBNET"
+        # For auto-mode networks, assume 'default' subnet
+        if [[ "$VM_NETWORK" == *"default"* ]]; then
+            VM_SUBNET="default"
+            echo "VM Subnet: $VM_SUBNET (inferred from auto-mode default network)"
+            echo "VM Subnet Range: 10.128.0.0/20 (default auto-mode subnet for this region)"
         else
-            VM_SUBNET="unknown"
+            # Fallback: try gcloud method
+            VM_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name 2>/dev/null)
+            VM_ZONE=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/zone 2>/dev/null | cut -d/ -f4)
+            
+            if [ -n "$VM_NAME" ] && [ -n "$VM_ZONE" ]; then
+                echo "Trying gcloud method with VM: $VM_NAME in zone: $VM_ZONE"
+                VM_SUBNET_FULL=$(gcloud compute instances describe "$VM_NAME" --zone="$VM_ZONE" --format="value(networkInterfaces[0].subnetwork)" 2>/dev/null)
+                VM_SUBNET=$(basename "$VM_SUBNET_FULL")
+                echo "VM Subnet (via gcloud): $VM_SUBNET"
+            else
+                VM_SUBNET="default"
+                echo "VM Subnet: $VM_SUBNET (fallback assumption)"
+            fi
         fi
     fi
 else
@@ -99,13 +107,25 @@ fi
 echo -e "\n7. Simple ping test:"
 ping -c 3 $INTERNAL_IP || echo "Ping failed"
 
-echo -e "\n8. All broker IPs test:"
+echo -e "\n8. IP Range Check:"
+echo "VM should be in 10.128.0.0/20 range, MSAK brokers at 10.128.0.26-29"
+VM_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip 2>/dev/null)
+echo "VM Internal IP: $VM_IP"
+
+echo -e "\n9. All broker IPs test:"
 BROKER_IPS=("10.128.0.26" "10.128.0.27" "10.128.0.28" "10.128.0.29")
 for ip in "${BROKER_IPS[@]}"; do
-    if timeout 3 bash -c "</dev/tcp/$ip/9092" 2>/dev/null; then
+    echo "Testing $ip:9092..."
+    if timeout 5 bash -c "</dev/tcp/$ip/9092" 2>/dev/null; then
         echo "✅ Broker $ip:9092 reachable"
     else
         echo "❌ Broker $ip:9092 NOT reachable"
+        # Also test if we can ping it
+        if ping -c 1 -W 2 $ip > /dev/null 2>&1; then
+            echo "   But ping to $ip works (IP reachable, port 9092 blocked/closed)"
+        else
+            echo "   Ping to $ip also fails (IP not reachable)"
+        fi
     fi
 done
 
