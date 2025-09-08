@@ -39,12 +39,12 @@ def oauth_cb_extended(config):
         
         expiry = credentials.expiry.timestamp() if credentials.expiry else time.time() + 3600
         
-        # Try extended format with principal and extensions
-        principal = None  # Can be None or user identifier
-        extensions = {}   # Additional SASL extensions
+        # Try different extended formats
+        print(f"Extended format: trying different variations...")
         
-        print(f"Extended format: returning (token, {expiry}, {principal}, {extensions})")
-        return credentials.token, expiry, principal, extensions
+        # Option 1: Just token and expiry (should work)
+        print(f"  Basic: (token, {expiry})")
+        return credentials.token, expiry
     except Exception as e:
         print(f"OAuth error: {e}")
         return "", 0
