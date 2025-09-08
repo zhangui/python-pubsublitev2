@@ -30,20 +30,24 @@ else
 fi
 
 echo -e "\n4. VM Network Info:"
-VM_SUBNET=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/subnetwork)
+VM_SUBNET_FULL=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/subnetwork)
+VM_SUBNET=$(basename "$VM_SUBNET_FULL")
 echo "VM Subnet: $VM_SUBNET"
+echo "VM Subnet Full Path: $VM_SUBNET_FULL"
 
 echo -e "\n5. MSAK Cluster Info:"
-MSAK_SUBNET=$(gcloud managed-kafka clusters describe testpsl --location=us-central1 --format="value(gcpConfig.accessConfig.networkConfigs[0].subnet)" 2>/dev/null)
+MSAK_SUBNET_FULL=$(gcloud managed-kafka clusters describe testpsl --location=us-central1 --format="value(gcpConfig.accessConfig.networkConfigs[0].subnet)" 2>/dev/null)
+MSAK_SUBNET=$(basename "$MSAK_SUBNET_FULL")
 echo "MSAK Subnet: $MSAK_SUBNET"
+echo "MSAK Subnet Full Path: $MSAK_SUBNET_FULL"
 
 echo -e "\n6. Network Match:"
 if [ "$VM_SUBNET" = "$MSAK_SUBNET" ]; then
     echo "✅ VM and MSAK on same subnet"
 else
     echo "❌ VM and MSAK on different subnets"
-    echo "VM: $VM_SUBNET"
-    echo "MSAK: $MSAK_SUBNET"
+    echo "VM Subnet: $VM_SUBNET"
+    echo "MSAK Subnet: $MSAK_SUBNET"
 fi
 
 echo -e "\n7. Simple ping test:"
