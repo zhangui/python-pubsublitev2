@@ -33,7 +33,15 @@ def main():
     }
 
     print("🔧 Creating Kafka producer...")
+    print(f"📋 Producer config:")
+    for key, value in config.items():
+        if key == 'oauth_cb':
+            print(f"   {key}: <TokenProvider.get_token>")
+        else:
+            print(f"   {key}: {value}")
+    
     producer = confluent_kafka.Producer(config)
+    print("✅ Producer created, testing connection...")
 
     # Delivery callback
     messages_delivered = 0
