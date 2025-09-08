@@ -13,12 +13,12 @@ import time
 def main():
     print("🚀 Testing MSAK Publisher with Direct Internal IP...")
     
-    # Use the actual internal IP of your MSAK bootstrap server
+    # Try using the hostname instead of IP for SSL compatibility
     msak_config = MSAKConfig(
         project_id='ygnahz-dolphin-dev',
         location='us-central1',
-        cluster_id='testpsl',
-        endpoint_override='10.128.0.26:9092'  # Direct internal IP
+        cluster_id='testpsl'
+        # Let it use the default hostname for SSL verification
     )
     
     topic_name = 'testtopic'
