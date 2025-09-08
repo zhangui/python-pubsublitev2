@@ -148,6 +148,7 @@ class MSAKPublisherTransport(PublisherTransport):
                 expiry_time = time.time() + 3600  # Default 1 hour
             
             # Return token and expiry as expected by confluent-kafka
+            # Format: (token_str, expiry_time[, principal, extensions])
             logger.debug(f"OAuth token refreshed, expires at: {expiry_time}")
             return credentials.token, expiry_time
             
