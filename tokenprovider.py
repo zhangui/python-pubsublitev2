@@ -1,4 +1,4 @@
-"""Google Cloud Token Provider for MSAK authentication - based on official Google example."""
+"""Google Cloud Token Provider for MSAK authentication - official Google implementation."""
 
 import base64
 import datetime
@@ -6,67 +6,66 @@ import json
 import time
 import google.auth
 from google.auth.transport.requests import Request
+import urllib3
 
 def encode(source):
     """Safe base64 encoding."""
     return base64.urlsafe_b64encode(source.encode('utf-8')).decode('utf-8').rstrip('=')
 
 class TokenProvider(object):
-    """Provides OAuth tokens from Google Cloud Application Default credentials."""
+    """
+    Provides OAuth tokens from Google Cloud Application Default credentials.
+    Official Google implementation from quickstart-python docs.
+    """
     HEADER = json.dumps({'typ':'JWT', 'alg':'GOOG_OAUTH2_TOKEN'})
 
     def __init__(self, **config):
-        """Initialize token provider."""
-        self.credentials, self.project = google.auth.default()
-        
-        # Apply cloud-platform scope
-        if hasattr(self.credentials, 'with_scopes'):
-            self.credentials = self.credentials.with_scopes([
-                'https://www.googleapis.com/auth/cloud-platform'
-            ])
-        
-        self.last_refresh = 0
-        print(f"🔐 TokenProvider initialized for project: {self.project}")
+        self.credentials, _project = google.auth.default()
+        self.http_client = urllib3.PoolManager()
+        print(f"🔐 TokenProvider initialized (official Google implementation)")
 
-    def get_token(self, config_str=None):
+    def get_credentials(self):
+        if not self.credentials.valid:
+            self.credentials.refresh(Request(self.http_client))
+        return self.credentials
+
+    def get_jwt(self, creds):
+        token_data = dict(
+            exp=creds.expiry.replace(tzinfo=datetime.timezone.utc).timestamp(),
+            iat=datetime.datetime.now(datetime.timezone.utc).timestamp(),
+            iss='Google',
+            sub=creds.service_account_email
+        )
+        return json.dumps(token_data)
+
+    def get_token(self, args):
         """
         Get OAuth token for MSAK authentication.
         
-        This method is called by confluent-kafka when authentication is needed.
-        Returns (token, expiry_timestamp) tuple.
+        Official Google implementation that creates a JWT token.
         """
         try:
-            print(f"🔄 Token requested by confluent-kafka")
+            print(f"🔄 Token requested by confluent-kafka (official Google method)")
             
-            # Refresh credentials if needed
-            now = time.time()
-            if now - self.last_refresh > 3300:  # Refresh every 55 minutes
-                print("   📡 Refreshing Google Cloud credentials...")
-                request = Request()
-                self.credentials.refresh(request)
-                self.last_refresh = now
-                print("   ✅ Credentials refreshed")
+            creds = self.get_credentials()
             
-            # Get current token
-            token = self.credentials.token
-            if not token:
-                print("   ❌ No access token available")
-                return "", 0
+            # Create JWT token exactly like Google's official example
+            token = '.'.join([
+                encode(self.HEADER),
+                encode(self.get_jwt(creds)),
+                encode(creds.token)
+            ])
+
+            # Compute expiry time exactly like Google's example
+            expiry_utc = creds.expiry.replace(tzinfo=datetime.timezone.utc)
+            now_utc = datetime.datetime.now(datetime.timezone.utc)
+            expiry_seconds = (expiry_utc - now_utc).total_seconds()
+
+            expiry_timestamp = time.time() + expiry_seconds
             
-            # Calculate expiry
-            if hasattr(self.credentials, 'expiry') and self.credentials.expiry:
-                expiry_timestamp = self.credentials.expiry.timestamp()
-                expiry_str = self.credentials.expiry.strftime('%Y-%m-%d %H:%M:%S UTC')
-                print(f"   ⏰ Token expires: {expiry_str}")
-            else:
-                # Default to 1 hour if no expiry info
-                expiry_timestamp = time.time() + 3600
-                print("   ⏰ No expiry info, defaulting to +1 hour")
-            
-            # Return the raw Google Cloud access token directly
-            # This matches what GcpLoginCallbackHandler does in Java
-            print(f"   ✅ Returning raw access token (length: {len(token)})")
-            print(f"   🔤 Token prefix: {token[:50]}...")
+            print(f"   ✅ JWT token created (official Google format)")
+            print(f"   🔤 Token prefix: {token[:80]}...")
+            print(f"   ⏰ Token expires in {expiry_seconds:.0f} seconds")
             
             return token, expiry_timestamp
             
