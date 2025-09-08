@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m pytest tests/unit/pubsublite/transport/ -v)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(gcloud auth application-default print-access-token:*)",
+      "Bash(unset:*)",
+      "Bash(nslookup:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

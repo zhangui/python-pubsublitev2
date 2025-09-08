@@ -43,6 +43,11 @@ from google.cloud.pubsublite.internal.wire.make_publisher import (
     DEFAULT_BATCHING_SETTINGS as WIRE_DEFAULT_BATCHING,
 )
 from google.cloud.pubsublite.types import TopicPath
+from google.cloud.pubsublite.transport import (
+    TransportType,
+    TransportFactory,
+    MSAKConfig,
+)
 from overrides import overrides
 
 
