@@ -33,35 +33,41 @@ echo -e "\n4. VM Network Info:"
 # Test if metadata service is available
 if curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/ > /dev/null 2>&1; then
     echo "✅ Metadata service is available"
-    VM_SUBNET_FULL=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/subnetwork)
-    VM_SUBNET=$(basename "$VM_SUBNET_FULL")
-    echo "VM Subnet: $VM_SUBNET"
-    echo "VM Subnet Full Path: $VM_SUBNET_FULL"
-else
-    echo "❌ Metadata service not available - this might not be a Google Cloud VM"
-    echo "Trying alternative method..."
     
-    # Alternative: try using gcloud to get VM info
-    VM_NAME=$(hostname)
-    echo "VM Name (from hostname): $VM_NAME"
+    # Debug: List available network interfaces
+    echo "Available network interfaces:"
+    curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/
     
-    # Try to get network info via gcloud
-    if command -v gcloud > /dev/null 2>&1; then
-        echo "Trying gcloud method..."
-        # This will require knowing the zone, but we can try to detect it
+    # Try to get network info step by step
+    echo "Getting network info..."
+    VM_NETWORK=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/network 2>/dev/null)
+    VM_SUBNET_FULL=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/subnetwork 2>/dev/null)
+    
+    if [ -n "$VM_SUBNET_FULL" ]; then
+        VM_SUBNET=$(basename "$VM_SUBNET_FULL")
+        echo "VM Network: $(basename "$VM_NETWORK")"
+        echo "VM Subnet: $VM_SUBNET"
+        echo "VM Subnet Full Path: $VM_SUBNET_FULL"
+    else
+        echo "❌ Could not get subnetwork from metadata"
+        echo "VM Network: $(basename "$VM_NETWORK")"
+        
+        # Fallback: try gcloud method
+        VM_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name 2>/dev/null)
         VM_ZONE=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/zone 2>/dev/null | cut -d/ -f4)
-        if [ -n "$VM_ZONE" ]; then
-            VM_SUBNET_FULL=$(gcloud compute instances describe $VM_NAME --zone=$VM_ZONE --format="value(networkInterfaces[0].subnetwork)" 2>/dev/null)
+        
+        if [ -n "$VM_NAME" ] && [ -n "$VM_ZONE" ]; then
+            echo "Trying gcloud method with VM: $VM_NAME in zone: $VM_ZONE"
+            VM_SUBNET_FULL=$(gcloud compute instances describe "$VM_NAME" --zone="$VM_ZONE" --format="value(networkInterfaces[0].subnetwork)" 2>/dev/null)
             VM_SUBNET=$(basename "$VM_SUBNET_FULL")
-            echo "VM Subnet: $VM_SUBNET"
+            echo "VM Subnet (via gcloud): $VM_SUBNET"
         else
-            echo "❌ Cannot determine VM zone"
             VM_SUBNET="unknown"
         fi
-    else
-        echo "❌ gcloud not available"
-        VM_SUBNET="unknown"
     fi
+else
+    echo "❌ Metadata service not available"
+    VM_SUBNET="unknown"
 fi
 
 echo -e "\n5. MSAK Cluster Info:"
