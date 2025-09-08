@@ -13,7 +13,10 @@ import time
 def oauth_cb(config):
     try:
         credentials, _ = default()
-        credentials = credentials.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
+        
+        # Apply scopes if the credential type supports it
+        if hasattr(credentials, 'with_scopes'):
+            credentials = credentials.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
         
         request = Request()
         credentials.refresh(request)
