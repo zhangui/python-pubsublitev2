@@ -11,27 +11,27 @@ echo "🔐 Setting up MSAK service account..."
 
 # Create service account
 echo "Creating service account: $SERVICE_ACCOUNT_NAME"
-gcloud iam service-accounts create $SERVICE_ACCOUNT_NAME \
-    --display-name="MSAK Test Service Account" \
-    --description="Service account for testing Managed Service for Apache Kafka" \
-    --project=$PROJECT_ID
+# gcloud iam service-accounts create $SERVICE_ACCOUNT_NAME \
+#     --display-name="MSAK Test Service Account" \
+#     --description="Service account for testing Managed Service for Apache Kafka" \
+#     --project=$PROJECT_ID
 
-# Grant required IAM roles
-echo "Granting IAM roles..."
+# # Grant required IAM roles
+# echo "Granting IAM roles..."
 
-# MSAK client role
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
-    --role=roles/managedkafka.client
+# # MSAK client role
+# gcloud projects add-iam-policy-binding $PROJECT_ID \
+#     --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
+#     --role=roles/managedkafka.client
 
-# Token creator roles (required for OAuth)
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
-    --role=roles/iam.serviceAccountTokenCreator
+# # Token creator roles (required for OAuth)
+# gcloud projects add-iam-policy-binding $PROJECT_ID \
+#     --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
+#     --role=roles/iam.serviceAccountTokenCreator
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
-    --role=roles/iam.serviceAccountOpenIdTokenCreator
+# gcloud projects add-iam-policy-binding $PROJECT_ID \
+#     --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
+#     --role=roles/iam.serviceAccountOpenIdTokenCreator
 
 # Create and download service account key
 echo "Creating service account key..."
