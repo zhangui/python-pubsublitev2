@@ -81,9 +81,7 @@ def test_msak():
                 print(f"✅ Message delivered to {msg.topic()}[{msg.partition()}] at offset {msg.offset()}")
         
         message = f"Test message from Python at {time.strftime('%Y-%m-%d %H:%M:%S')}"
-        client.publish(
-            
-        )
+
         response = client.publish(topic=TOPIC,
             data=message,
             # ordering_key=f"test-key-{i % 2}",  # Alternates between two keys for partitioning
