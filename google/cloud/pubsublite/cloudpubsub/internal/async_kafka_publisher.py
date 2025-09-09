@@ -132,10 +132,6 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
         try:
             message = self._create_kafka_message(data, ordering_key, **attrs)
             
-            # Create a future for the async result
-            # loop = asyncio.get_event_loop()
-            # future = loop.create_future()
-            
             def callback(error, message):
                 if error is not None:
                     print(error)
@@ -148,11 +144,6 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             print("\n hahah")
             message=f"hello world!".encode('utf-8')
             
-            
-            # Poll for events in a non-blocking way
-            
-            
-            # Wait for the callback to be executed
             return self._producer.produce("testtopic", message, callback=callback)
             
         except Exception as e:

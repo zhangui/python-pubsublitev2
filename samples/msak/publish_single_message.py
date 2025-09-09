@@ -95,12 +95,6 @@ def publish_single_message(
             print(f"✓ Message published successfully!")
             print(f"  Ack ID: {ack_id}")
             
-            # Parse Kafka ack ID (format: topic:partition:offset)
-            if ":" in ack_id:
-                topic, partition, offset = ack_id.split(":")
-                print(f"  Topic: {topic}")
-                print(f"  Partition: {partition}")
-                print(f"  Offset: {offset}")
     
     except Exception as error:
         print(f"✗ Failed to publish message: {error}")
