@@ -150,7 +150,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                         future.set_result(ack_id)
             
             # Publish to Kafka with callback
-            self._producer.produce(callback=delivery_callback, **message)
+            self._producer.produce(self._topic_name, **message, callback=delivery_callback)
             
             # Poll for events in a non-blocking way
             self._producer.poll(0)
