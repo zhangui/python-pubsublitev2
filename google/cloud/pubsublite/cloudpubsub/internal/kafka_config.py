@@ -32,23 +32,5 @@ def create_default_kafka_producer_config() -> Dict[str, Any]:
     """Create default Kafka producer configuration optimized for Google Cloud."""
     return {
         # Performance settings
-        'batch.size': 16384,
-        'linger.ms': 5,
-        'compression.type': 'snappy',
-        
-        # Reliability settings
-        'acks': 'all',
-        'retries': 3,
-        'retry.backoff.ms': 100,
-        'max.in.flight.requests.per.connection': 5,
-        'enable.idempotence': True,
-        
-        # Timeout settings
-        'request.timeout.ms': 30000,
-        'delivery.timeout.ms': 120000,
-        
-        # Buffer settings
-        'buffer.memory': 33554432,  # 32MB
-        'send.buffer.bytes': 131072,  # 128KB
-        'receive.buffer.bytes': 65536,  # 64KB
+        "acks": "all",  # Ensure all replicas acknowledge
     }

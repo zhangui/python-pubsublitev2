@@ -70,10 +70,8 @@ def publish_single_message(
         use_kafka=True,
         kafka_producer_config={
             'bootstrap.servers': bootstrap_servers,
-            # OAuth configuration - will be replaced with mTLS in the future
             'security.protocol': 'SASL_SSL',
             'sasl.mechanisms': 'OAUTHBEARER',
-            'sasl.oauthbearer.token.endpoint.url': 'localhost:14293',
             'oauth_cb': token_provider.get_token,
         }
     )
