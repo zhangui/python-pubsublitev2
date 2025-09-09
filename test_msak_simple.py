@@ -66,7 +66,6 @@ def test_msak():
         message = f"Test message from Python at {time.strftime('%Y-%m-%d %H:%M:%S')}"
         producer.produce(
             TOPIC,
-            key='test-key',
             value=message.encode('utf-8'),
             callback=delivery_callback
         )
