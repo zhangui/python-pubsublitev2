@@ -168,7 +168,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             
         try:
             # producer_config = self._create_producer_config()
-            self._producer = Producer(self._kafka_config)
+            self._producer = Producer(self._kafka_config.producer_config)
             self._started = True
             logger.info(f"Kafka producer started for topic: {self._topic_name}")
             return self
