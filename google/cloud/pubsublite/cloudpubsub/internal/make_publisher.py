@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from typing import Optional, Mapping
 
 from google.api_core.client_options import ClientOptions
@@ -37,6 +38,18 @@ from google.cloud.pubsublite.internal.wire.merge_metadata import merge_metadata
 from google.cloud.pubsublite.internal.wire.pubsub_context import pubsub_context
 from google.cloud.pubsublite.types import TopicPath
 
+# Optional Kafka imports - only loaded if Kafka functionality is requested
+try:
+    from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher import (
+        AsyncKafkaPublisher,
+    )
+    from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+    KAFKA_AVAILABLE = True
+except ImportError:
+    AsyncKafkaPublisher = None
+    KafkaConfig = None
+    KAFKA_AVAILABLE = False
+
 
 DEFAULT_BATCHING_SETTINGS = WIRE_DEFAULT_BATCHING
 
@@ -49,6 +62,8 @@ def make_async_publisher(
     client_options: Optional[ClientOptions] = None,
     metadata: Optional[Mapping[str, str]] = None,
     client_id: Optional[PublisherClientId] = None,
+    use_kafka: bool = False,
+    kafka_config: Optional[KafkaConfig] = None,
 ) -> AsyncSinglePublisher:
     """
     Make a new publisher for the given topic.
@@ -61,6 +76,8 @@ def make_async_publisher(
       client_options: Other options to pass to the client. Note that if you pass any you must set api_endpoint.
       metadata: Additional metadata to send with the RPC.
       client_id: 128-bit unique client id. If set, enables publish idempotency for the session.
+      use_kafka: If True, use Kafka backend instead of Pub/Sub Lite.
+      kafka_config: Configuration for Kafka backend. Required if use_kafka is True.
 
     Returns:
       A new AsyncPublisher.
@@ -68,6 +85,22 @@ def make_async_publisher(
     Throws:
       GoogleApiCallException on any error determining topic structure.
     """
+    if use_kafka:
+        if not KAFKA_AVAILABLE:
+            raise ImportError(
+                "Kafka functionality requested but confluent-kafka is not installed. "
+                "Install with: pip install google-cloud-pubsublite[kafka]"
+            )
+        
+        if kafka_config is None:
+            raise ValueError(
+                "kafka_config must be provided when use_kafka=True"
+            )
+        
+        # Return Kafka publisher implementation
+        return AsyncKafkaPublisher(kafka_config, topic.name)
+    
+    # Original Pub/Sub Lite implementation
     metadata = merge_metadata(pubsub_context(framework="CLOUD_PUBSUB_SHIM"), metadata)
 
     def underlying_factory():
@@ -92,6 +125,8 @@ def make_publisher(
     client_options: Optional[ClientOptions] = None,
     metadata: Optional[Mapping[str, str]] = None,
     client_id: Optional[PublisherClientId] = None,
+    use_kafka: bool = False,
+    kafka_config: Optional[KafkaConfig] = None,
 ) -> SinglePublisher:
     """
     Make a new publisher for the given topic.
@@ -104,6 +139,8 @@ def make_publisher(
       client_options: Other options to pass to the client. Note that if you pass any you must set api_endpoint.
       metadata: Additional metadata to send with the RPC.
       client_id: 128-bit unique client id. If set, enables publish idempotency for the session.
+      use_kafka: If True, use Kafka backend instead of Pub/Sub Lite.
+      kafka_config: Configuration for Kafka backend. Required if use_kafka is True.
 
     Returns:
       A new Publisher.
@@ -120,5 +157,7 @@ def make_publisher(
             client_options=client_options,
             metadata=metadata,
             client_id=client_id,
+            use_kafka=use_kafka,
+            kafka_config=kafka_config,
         )
     )

@@ -1,6 +1,6 @@
 # Google Managed Service for Apache Kafka Samples
 
-This directory contains samples for using the Universal Publisher Client with Google Managed Service for Apache Kafka backend.
+This directory contains samples for using the PublisherClient with Google Managed Service for Apache Kafka backend.
 
 ## Prerequisites
 
@@ -85,8 +85,9 @@ Message publishing completed successfully!
 
 ## Key Features
 
-- **Unified API**: Uses the same interface as Pub/Sub Lite clients
-- **Automatic Authentication**: Leverages Google Cloud Application Default Credentials
+- **Unified API**: Uses the same PublisherClient interface for both Pub/Sub Lite and Kafka
+- **Automatic Backend Selection**: Environment variable or explicit configuration 
+- **Token Provider Support**: Supports custom token providers for OAuth authentication
 - **Error Handling**: Comprehensive error handling with clear messages
 - **Kafka Integration**: Seamless integration with Google Managed Service for Apache Kafka
 - **Message Attributes**: Support for custom attributes as Kafka headers
@@ -114,4 +115,4 @@ pip install google-cloud-pubsublite[kafka]
 
 - [Google Managed Service for Apache Kafka Documentation](https://cloud.google.com/managed-service-for-apache-kafka/docs)
 - [Python Client Quickstart](https://cloud.google.com/managed-service-for-apache-kafka/docs/quickstart-python)
-- [Universal Publisher Client Documentation](../../google/cloud/pubsublite/cloudpubsub/universal_client.py)
+- [Publisher Client Documentation](../../google/cloud/pubsublite/cloudpubsub/publisher_client.py)

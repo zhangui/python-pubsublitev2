@@ -30,12 +30,8 @@ from tokenprovider import TokenProvider
 # Add the parent directory to sys.path for development usage
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from google.cloud.pubsublite.cloudpubsub.universal_client import (
-    UniversalPublisherClient,
-    create_kafka_config,
-)
+from google.cloud.pubsublite.cloudpubsub.publisher_client import PublisherClient
 from google.cloud.pubsublite.types import TopicPath
-from google.auth import default
 
 
 def publish_single_message(
@@ -43,7 +39,6 @@ def publish_single_message(
     location: str,
     topic_name: str,
     bootstrap_servers: str,
-    auth_endpoint: str = "localhost:14293",
     message: str = "Hello from Google Managed Service for Apache Kafka!"
 ):
     """
@@ -54,7 +49,6 @@ def publish_single_message(
         location: Google Cloud location (e.g., "us-central1-a") 
         topic_name: Name of the Kafka topic
         bootstrap_servers: Comma-separated list of Kafka bootstrap servers
-        auth_endpoint: OAuth authentication endpoint
         message: Message content to publish
     """
     
@@ -71,21 +65,20 @@ def publish_single_message(
 
     token_provider = TokenProvider()
     
-    # Configure Kafka backend
-    servers_list = [server.strip() for server in bootstrap_servers.split(',')]
-    kafka_config = create_kafka_config(
-        bootstrap_servers=servers_list,
-        auth_endpoint=auth_endpoint,
-        credentials=token_provider.get_token,  # Use Application Default Credentials
-    )
-    
-    # Create Universal Publisher Client with Kafka backend
-    client = UniversalPublisherClient(
+    # Configure and create Publisher Client with Kafka backend
+    client = PublisherClient(
         use_kafka=True,
-        kafka_config=kafka_config
+        kafka_producer_config={
+            'bootstrap.servers': bootstrap_servers,
+            # OAuth configuration - will be replaced with mTLS in the future
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'OAUTHBEARER',
+            'sasl.oauthbearer.token.endpoint.url': 'localhost:14293',
+            'oauth_cb': token_provider.get_token,
+        }
     )
     
-    print(f"Using backend: {client.backend_type}")
+    print(f"Using backend: kafka")
     
     try:
         with client:
@@ -141,11 +134,6 @@ def main():
         help="Comma-separated list of Kafka bootstrap servers (e.g., server1:9092,server2:9092)"
     )
     parser.add_argument(
-        "--auth-endpoint",
-        default="localhost:14293",
-        help="OAuth authentication endpoint (default: localhost:14293)"
-    )
-    parser.add_argument(
         "--message",
         default="Hello from Google Managed Service for Apache Kafka!",
         help="Message content to publish"
@@ -162,7 +150,6 @@ def main():
         location=args.location,
         topic_name=args.topic_name,
         bootstrap_servers=args.bootstrap_servers,
-        auth_endpoint=args.auth_endpoint,
         message=args.message
     )
     

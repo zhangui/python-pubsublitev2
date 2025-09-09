@@ -118,16 +118,6 @@ from google.cloud.pubsublite_v1.types.topic_stats import ComputeMessageStatsResp
 from google.cloud.pubsublite.admin_client_interface import AdminClientInterface
 from google.cloud.pubsublite.admin_client import AdminClient
 
-# Universal publisher clients for Pub/Sub Lite and Kafka backends
-try:
-    from google.cloud.pubsublite.cloudpubsub.universal_client import (
-        UniversalPublisherClient,
-        create_kafka_config,
-    )
-    from google.cloud.pubsublite.cloudpubsub.msak_client import MsakClient, KafkaConfig
-    KAFKA_SUPPORT_AVAILABLE = True
-except ImportError:
-    KAFKA_SUPPORT_AVAILABLE = False
 
 __all__ = (
     # Manual files
@@ -206,13 +196,3 @@ __all__ = (
     "UpdateSubscriptionRequest",
     "UpdateTopicRequest",
 )
-
-# Add universal client classes to __all__ if Kafka support is available
-if KAFKA_SUPPORT_AVAILABLE:
-    __all__ = __all__ + (
-        "UniversalPublisherClient",
-        "MsakClient", 
-        "KafkaConfig",
-        "create_kafka_config",
-        "KAFKA_SUPPORT_AVAILABLE",
-    )

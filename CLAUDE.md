@@ -53,23 +53,24 @@ This is the **Google Cloud Pub/Sub Lite Python client library**, which provides 
 - Interface-based design with implementations
 - Async and sync variants for most operations
 
-### Universal Publisher Client (New)
+### Kafka Backend Integration (New)
 
-**Multi-Backend Support:**
-- `UniversalPublisherClient`: Switches between Pub/Sub Lite and Kafka backends
-- `MsakClient`: Kafka backend using confluent-kafka library for Google Managed Service for Apache Kafka
+**Multi-Backend Publisher:**
+- `PublisherClient` now supports both Pub/Sub Lite and Kafka backends
+- `AsyncKafkaPublisher`: Internal Kafka implementation using confluent-kafka library
 - `KafkaConfig`: Configuration for Kafka connection and authentication
 
 **Backend Selection:**
 - Environment variable: `PUBSUBLITE_USE_KAFKA=true/false`
-- Constructor parameter: `use_kafka=True/False`
+- Constructor parameters: `use_kafka=True/False` + `kafka_bootstrap_servers`
 - Default: Pub/Sub Lite (backward compatibility)
 
 **Kafka Integration:**
-- Uses OAuth/SASL_SSL authentication with Google Cloud credentials
-- Converts TopicPath to Kafka topic names
+- Uses OAuth/SASL_SSL authentication with Google Cloud credentials or token providers
+- Converts TopicPath to Kafka topic names automatically
 - Maps Pub/Sub message format to Kafka (data→value, ordering_key→partition_key, attrs→headers)
 - Returns topic:partition:offset as ack ID
+- Reuses all existing multiplexing and error handling infrastructure
 
 ## Dependencies
 
