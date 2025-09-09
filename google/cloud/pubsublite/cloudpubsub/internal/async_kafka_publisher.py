@@ -68,19 +68,19 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
         
         # TODO: Add mTLS support when available
         # For now, use OAuth authentication with default endpoint
-        if 'security.protocol' not in config:
-            config['security.protocol'] = 'SASL_SSL'
-            config['sasl.mechanisms'] = 'OAUTHBEARER'
-            config['sasl.oauthbearer.token.endpoint.url'] = 'localhost:14293'  # Default OAuth endpoint
-            config['sasl.oauthbearer.client.id'] = 'unused'
-            config['sasl.oauthbearer.client.secret'] = 'unused'
-            config['sasl.oauthbearer.method'] = 'oidc'
+        # if 'security.protocol' not in config:
+        #     config['security.protocol'] = 'SASL_SSL'
+        #     config['sasl.mechanisms'] = 'OAUTHBEARER'
+        #     config['sasl.oauthbearer.token.endpoint.url'] = 'localhost:14293'  # Default OAuth endpoint
+        #     config['sasl.oauthbearer.client.id'] = 'unused'
+        #     config['sasl.oauthbearer.client.secret'] = 'unused'
+        #     config['sasl.oauthbearer.method'] = 'oidc'
         
         # Use credentials to create token provider if OAuth is configured
-        if config.get('security.protocol') == 'SASL_SSL' and self._kafka_config.credentials:
-            # TODO: Implement credential-based token provider
-            # For now, this is a placeholder for when OAuth token provider is implemented
-            pass
+        # if config.get('security.protocol') == 'SASL_SSL' and self._kafka_config.credentials:
+        #     # TODO: Implement credential-based token provider
+        #     # For now, this is a placeholder for when OAuth token provider is implemented
+        #     pass
         
         return config
 
