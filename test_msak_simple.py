@@ -7,6 +7,8 @@ import time
 from confluent_kafka import Producer
 from google.auth import default
 from google.auth.transport.requests import Request
+from google.cloud.pubsublite.cloudpubsub.enhanced_publisher_client import EnhancedPublisherClient
+from google.cloud.pubsublite.transport import MSAKConfig
 
 from tokenprovider import TokenProvider
 
@@ -42,11 +44,26 @@ def test_msak():
         # 'socket.timeout.ms': 30000,
         # 'api.version.request.timeout.ms': 30000,
     }
+    msak_config = MSAKConfig(
+        project_id='ygnahz-eg-codelab',
+        location='us-central1',
+        cluster_id='testpsl',
+        credentials=token_provider.get_token
+    )
     
     try:
         # Create producer
         print("\n🔧 Creating Kafka producer...")
-        producer = Producer(config)
+
+        # producer = Producer(config)
+        client = EnhancedPublisherClient.create_for_msak(
+            topic=TOPIC,
+            msak_config=msak_config
+            # per_partition_batching_settings=BatchSettings(
+            #     max_messages=10,
+            #     max_bytes=1024*1024,  # 1MB
+            # )
+        )
         print("✅ Producer created successfully!")
         
         # Test connection
@@ -64,15 +81,29 @@ def test_msak():
                 print(f"✅ Message delivered to {msg.topic()}[{msg.partition()}] at offset {msg.offset()}")
         
         message = f"Test message from Python at {time.strftime('%Y-%m-%d %H:%M:%S')}"
-        producer.produce(
-            TOPIC,
-            value=message.encode('utf-8'),
-            callback=delivery_callback
+        client.publish(
+            
         )
+        response = client.publish(topic=TOPIC,
+            data=message,
+            # ordering_key=f"test-key-{i % 2}",  # Alternates between two keys for partitioning
+            # message_type="test",
+            # sender="python-msak-client",
+            # timestamp=str(int(time.time()))
+        )
+
+    # Handle the response
+        # async for response in stream:,
+        print(response)
+        # producer.produce(
+        #     TOPIC,
+        #     value=message.encode('utf-8'),
+        #     callback=delivery_callback
+        # )
         
         # Wait for delivery
         print("⏳ Waiting for delivery...")
-        producer.flush(timeout=10)
+        # producer.flush(timeout=10)
         
         print("\n🎉 Test completed successfully!")
         return 0
