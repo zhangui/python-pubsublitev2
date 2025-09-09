@@ -25,6 +25,7 @@ interface as Pub/Sub Lite, with automatic backend switching.
 import argparse
 import sys
 import os
+from tokenprovider import TokenProvider
 
 # Add the parent directory to sys.path for development usage
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
@@ -67,13 +68,15 @@ def publish_single_message(
     print(f"Publishing to Kafka topic: {topic_name}")
     print(f"Bootstrap servers: {bootstrap_servers}")
     print(f"Message: {message}")
+
+    token_provider = TokenProvider()
     
     # Configure Kafka backend
     servers_list = [server.strip() for server in bootstrap_servers.split(',')]
     kafka_config = create_kafka_config(
         bootstrap_servers=servers_list,
         auth_endpoint=auth_endpoint,
-        credentials=default()[0],  # Use Application Default Credentials
+        credentials=token_provider.get_token,  # Use Application Default Credentials
     )
     
     # Create Universal Publisher Client with Kafka backend
