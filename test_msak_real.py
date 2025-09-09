@@ -39,11 +39,11 @@ def main():
         print("🔧 Creating MSAK publisher client...")
         client = EnhancedPublisherClient.create_for_msak(
             topic=topic_name,
-            msak_config=msak_config,
-            per_partition_batching_settings=BatchSettings(
-                max_messages=10,
-                max_bytes=1024*1024,  # 1MB
-            )
+            msak_config=msak_config
+            # per_partition_batching_settings=BatchSettings(
+            #     max_messages=10,
+            #     max_bytes=1024*1024,  # 1MB
+            # )
         )
         
         print(f"✅ Client created successfully!")
