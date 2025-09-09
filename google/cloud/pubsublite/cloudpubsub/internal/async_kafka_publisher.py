@@ -153,7 +153,8 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             # print(self._topic_name)
             # print(**message)
             print("\n hahah")
-            self._producer.produce("testtopic", "HHAHA", callback=delivery_callback)
+            message=f"hello world!".encode('utf-8')
+            self._producer.produce("testtopic", message, callback=delivery_callback)
             
             # Poll for events in a non-blocking way
             self._producer.poll(0)
