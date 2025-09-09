@@ -32,5 +32,5 @@ def create_default_kafka_producer_config() -> Dict[str, Any]:
     """Create default Kafka producer configuration optimized for Google Cloud."""
     return {
         # Performance settings
-        "acks": "all",  # Ensure all replicas acknowledge
+        # "acks": "all",  # Ensure all replicas acknowledge
     }
