@@ -45,6 +45,10 @@ dependencies = [
     "proto-plus >= 1.22.3, < 2.0.0dev",
     "proto-plus >= 1.25.0, < 2.0.0dev; python_version >= '3.13'",
 ]
+
+kafka_dependencies = [
+    "confluent-kafka >= 2.0.0, <3.0.0dev",
+]
 url = "https://github.com/googleapis/python-pubsublite"
 
 package_root = os.path.abspath(os.path.dirname(__file__))
@@ -86,6 +90,9 @@ setuptools.setup(
     packages=packages,
     python_requires=">=3.8",
     install_requires=dependencies,
+    extras_require={
+        "kafka": kafka_dependencies,
+    },
     include_package_data=True,
     zip_safe=False,
 )

@@ -1,0 +1,7 @@
+# Requirements for Google Managed Service for Apache Kafka samples
+
+# Core library with Kafka support
+google-cloud-pubsublite[kafka]>=1.0.0
+
+# Google Cloud authentication
+google-auth>=2.0.0
