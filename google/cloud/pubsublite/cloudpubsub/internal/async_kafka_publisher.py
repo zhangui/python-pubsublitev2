@@ -153,7 +153,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             
             
             # Wait for the callback to be executed
-            return await self._producer.produce("testtopic", message, callback=callback)
+            return self._producer.produce("testtopic", message, callback=callback)
             
         except Exception as e:
             raise GoogleAPICallError(f"Failed to publish message: {e}")
