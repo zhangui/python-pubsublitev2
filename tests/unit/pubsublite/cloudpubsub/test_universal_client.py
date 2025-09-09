@@ -20,7 +20,6 @@ from concurrent.futures import Future
 from google.cloud.pubsublite.cloudpubsub.universal_client import UniversalPublisherClient
 from google.cloud.pubsublite.types import TopicPath
 
-
 class TestUniversalPublisherClient(unittest.TestCase):
     
     def setUp(self):
@@ -42,26 +41,38 @@ class TestUniversalPublisherClient(unittest.TestCase):
         self.assertFalse(client._use_kafka)
         self.assertEqual(client.backend_type, "pubsublite")
 
-    def test_explicit_kafka_backend(self):
+    @mock.patch('google.auth.default')
+    def test_explicit_kafka_backend(self, mock_default):
         """Test explicitly setting Kafka backend."""
         from google.cloud.pubsublite.cloudpubsub.msak_client import KafkaConfig
+        
+        # Mock credentials
+        mock_creds = mock.MagicMock()
+        mock_default.return_value = (mock_creds, 'test-project')
         
         kafka_config = KafkaConfig(
             bootstrap_servers=['localhost:9092'],
             auth_endpoint='localhost:14293',
+            credentials=mock_creds,  # Provide mock credentials
         )
         
         client = UniversalPublisherClient(use_kafka=True, kafka_config=kafka_config)
         self.assertTrue(client._use_kafka)
         self.assertEqual(client.backend_type, "kafka")
 
-    def test_environment_variable_kafka_true(self):
+    @mock.patch('google.auth.default')
+    def test_environment_variable_kafka_true(self, mock_default):
         """Test using Kafka backend via environment variable."""
         from google.cloud.pubsublite.cloudpubsub.msak_client import KafkaConfig
+        
+        # Mock credentials
+        mock_creds = mock.MagicMock()
+        mock_default.return_value = (mock_creds, 'test-project')
         
         kafka_config = KafkaConfig(
             bootstrap_servers=['localhost:9092'],
             auth_endpoint='localhost:14293',
+            credentials=mock_creds,  # Provide mock credentials
         )
         
         with mock.patch.dict(os.environ, {'PUBSUBLITE_USE_KAFKA': 'true'}):
@@ -83,12 +94,13 @@ class TestUniversalPublisherClient(unittest.TestCase):
             with client:
                 pass
 
-    @mock.patch('google.cloud.pubsublite.cloudpubsub.publisher_client.PublisherClient')
+    @mock.patch('google.cloud.pubsublite.cloudpubsub.universal_client.PublisherClient')
     def test_pubsublite_backend_delegation(self, mock_pubsublite_client):
         """Test that calls are properly delegated to Pub/Sub Lite backend."""
         # Setup mock
         mock_instance = mock_pubsublite_client.return_value
         mock_instance.__enter__.return_value = mock_instance
+        mock_instance.__exit__.return_value = None
         
         future = Future()
         future.set_result("test-ack-id")
@@ -116,14 +128,20 @@ class TestUniversalPublisherClient(unittest.TestCase):
             # Verify result
             self.assertEqual(result_future.result(), "test-ack-id")
 
-    @mock.patch('google.cloud.pubsublite.cloudpubsub.msak_client.MsakClient')
-    def test_kafka_backend_delegation(self, mock_kafka_client):
+    @mock.patch('google.cloud.pubsublite.cloudpubsub.universal_client.MsakClient')
+    @mock.patch('google.auth.default')
+    def test_kafka_backend_delegation(self, mock_default, mock_kafka_client):
         """Test that calls are properly delegated to Kafka backend."""
         from google.cloud.pubsublite.cloudpubsub.msak_client import KafkaConfig
+        
+        # Mock credentials
+        mock_creds = mock.MagicMock()
+        mock_default.return_value = (mock_creds, 'test-project')
         
         # Setup mock
         mock_instance = mock_kafka_client.return_value
         mock_instance.__enter__.return_value = mock_instance
+        mock_instance.__exit__.return_value = None
         
         future = Future()
         future.set_result("test-topic:0:12345")
@@ -133,6 +151,7 @@ class TestUniversalPublisherClient(unittest.TestCase):
         kafka_config = KafkaConfig(
             bootstrap_servers=['localhost:9092'],
             auth_endpoint='localhost:14293',
+            credentials=mock_creds,
         )
         
         client = UniversalPublisherClient(use_kafka=True, kafka_config=kafka_config)

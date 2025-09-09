@@ -24,6 +24,10 @@ interface as Pub/Sub Lite, with automatic backend switching.
 
 import argparse
 import sys
+import os
+
+# Add the parent directory to sys.path for development usage
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from google.cloud.pubsublite.cloudpubsub.universal_client import (
     UniversalPublisherClient,

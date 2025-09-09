@@ -38,18 +38,26 @@ class TestMsakClient(unittest.TestCase):
         self.test_ordering_key = "test-key"
         self.test_attrs = {"attr1": "value1", "attr2": "value2"}
         
+        # Use mock credentials to avoid authentication issues
+        self.mock_creds = mock.MagicMock()
         self.kafka_config = KafkaConfig(
             bootstrap_servers=['localhost:9092'],
             auth_endpoint='localhost:14293',
-            producer_config={'test.config': 'value'}
+            producer_config={'test.config': 'value'},
+            credentials=self.mock_creds
         )
 
-    def test_kafka_config_creation(self):
+    @mock.patch('google.auth.default')
+    def test_kafka_config_creation(self, mock_default):
         """Test KafkaConfig creation and properties."""
+        mock_creds = mock.MagicMock()
+        mock_default.return_value = (mock_creds, 'test-project')
+        
         config = KafkaConfig(
             bootstrap_servers=['server1:9092', 'server2:9092'],
             auth_endpoint='localhost:14293',
-            producer_config={'custom.setting': 'value'}
+            producer_config={'custom.setting': 'value'},
+            credentials=mock_creds
         )
         
         self.assertEqual(config.bootstrap_servers, ['server1:9092', 'server2:9092'])
@@ -116,6 +124,7 @@ class TestMsakClient(unittest.TestCase):
     def test_context_manager_lifecycle(self, mock_producer_class):
         """Test proper context manager lifecycle."""
         mock_producer_instance = mock.MagicMock()
+        mock_producer_instance.flush.return_value = 0  # Mock flush to return 0 (no remaining messages)
         mock_producer_class.return_value = mock_producer_instance
         
         client = MsakClient(self.kafka_config)
@@ -125,13 +134,14 @@ class TestMsakClient(unittest.TestCase):
             self.assertTrue(client._started)
             mock_producer_class.assert_called_once()
             
-        mock_producer_instance.flush.assert_called_once()
+        mock_producer_instance.flush.assert_called_once_with(30)
         self.assertFalse(client._started)
 
     @mock.patch('google.cloud.pubsublite.cloudpubsub.msak_client.Producer')
     def test_publish_success(self, mock_producer_class):
         """Test successful message publishing."""
         mock_producer_instance = mock.MagicMock()
+        mock_producer_instance.flush.return_value = 0  # Mock flush to return 0
         mock_producer_class.return_value = mock_producer_instance
         
         # Setup successful callback
@@ -169,6 +179,7 @@ class TestMsakClient(unittest.TestCase):
     def test_publish_error(self, mock_producer_class):
         """Test error handling during message publishing."""
         mock_producer_instance = mock.MagicMock()
+        mock_producer_instance.flush.return_value = 0  # Mock flush to return 0
         mock_producer_class.return_value = mock_producer_instance
         
         # Setup error callback

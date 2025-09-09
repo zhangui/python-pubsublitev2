@@ -51,8 +51,14 @@ class KafkaConfig:
     ):
         self.bootstrap_servers = bootstrap_servers
         self.auth_endpoint = auth_endpoint
-        self.credentials = credentials or default()[0]
+        self.credentials = credentials  # Don't load default credentials in __init__
         self.producer_config = producer_config or {}
+    
+    def _get_credentials(self) -> Credentials:
+        """Get credentials, loading defaults if not provided."""
+        if self.credentials is None:
+            return default()[0]
+        return self.credentials
 
 
 class MsakClient(PublisherClientInterface):
@@ -229,7 +235,7 @@ class MsakClient(PublisherClientInterface):
             if self._producer:
                 # Flush any pending messages (wait up to 30 seconds)
                 remaining = self._producer.flush(30)
-                if remaining > 0:
+                if remaining is not None and remaining > 0:
                     logger.warning(f"Failed to flush {remaining} messages on shutdown")
                 self._producer = None
             self._started = False
