@@ -8,30 +8,7 @@ from confluent_kafka import Producer
 from google.auth import default
 from google.auth.transport.requests import Request
 
-def oauth_callback(config_str):
-    """OAuth callback for SASL authentication."""
-    try:
-        # Get default credentials
-        credentials, project = default()
-        
-        # Add required scopes
-        if hasattr(credentials, 'with_scopes'):
-            credentials = credentials.with_scopes([
-                'https://www.googleapis.com/auth/cloud-platform'
-            ])
-        
-        # Refresh token if needed
-        if not credentials.valid:
-            request = Request()
-            credentials.refresh(request)
-        
-        # Return token and expiry
-        expiry = credentials.expiry.timestamp() if credentials.expiry else time.time() + 3600
-        return credentials.token, expiry
-        
-    except Exception as e:
-        print(f"OAuth error: {e}")
-        return "", 0
+from tokenprovider import TokenProvider
 
 def test_msak():
     """Test MSAK connection and publishing."""
@@ -49,20 +26,21 @@ def test_msak():
     
     print(f"📡 Bootstrap servers: {bootstrap_servers}")
     print(f"📝 Topic: {TOPIC}")
+    token_provider = TokenProvider()
     
     # Confluent Kafka configuration
     config = {
         'bootstrap.servers': bootstrap_servers,
         'security.protocol': 'SASL_SSL',
         'sasl.mechanism': 'OAUTHBEARER',
-        'oauth_cb': oauth_callback,
-        'client.id': 'python-msak-test',
+        'oauth_cb': token_provider.get_token,
+        # 'client.id': 'python-msak-test',
         # SSL configuration
-        'ssl.endpoint.identification.algorithm': 'none',
-        'ssl.ca.location': 'probe',  # Use system CA certificates
+        # 'ssl.endpoint.identification.algorithm': 'none',
+        # 'ssl.ca.location': 'probe',  # Use system CA certificates
         # Additional settings
-        'socket.timeout.ms': 30000,
-        'api.version.request.timeout.ms': 30000,
+        # 'socket.timeout.ms': 30000,
+        # 'api.version.request.timeout.ms': 30000,
     }
     
     try:

@@ -60,7 +60,7 @@ def main():
                 future = client.publish(
                     topic=topic_name,
                     data=message_data,
-                    ordering_key=f"test-key-{i % 2}",  # Alternates between two keys for partitioning
+                    # ordering_key=f"test-key-{i % 2}",  # Alternates between two keys for partitioning
                     message_type="test",
                     sender="python-msak-client",
                     timestamp=str(int(time.time()))
