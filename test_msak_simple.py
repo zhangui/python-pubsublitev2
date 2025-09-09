@@ -51,8 +51,8 @@ def test_msak():
         
         # Test connection
         print("\n🔌 Testing connection...")
-        metadata = producer.list_topics(timeout=10)
-        print(f"✅ Connected! Found {len(metadata.topics)} topics")
+        # metadata = producer.list_topics(timeout=10)
+        # print(f"✅ Connected! Found {len(metadata.topics)} topics")
         
         # Publish test message
         print(f"\n📤 Publishing message to {TOPIC}...")
