@@ -10,7 +10,7 @@ from tokenprovider import TokenProvider
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-b', '--bootstrap-servers', dest='bootstrap', type=str, required=True)
-parser.add_argument('-t', '--topic-name', dest='topic_name', type=str, default='example-topic')
+parser.add_argument('-t', '--topic-name', dest='topic_name', type=str, default='testtopic')
 parser.add_argument('-n', '--num_messages', dest='num_messages', type=int, default=3)
 parser.add_argument('--poll_timeout_s', type=float, default=0.2, help='Per-poll timeout seconds')
 parser.add_argument('--overall_timeout_s', type=float, default=10.0, help='Overall timeout to stop polling')
