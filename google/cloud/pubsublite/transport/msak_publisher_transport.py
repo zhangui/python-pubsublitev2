@@ -103,14 +103,14 @@ class MSAKPublisherTransport(PublisherTransport):
             'security.protocol': 'SASL_SSL',
             'sasl.mechanism': 'OAUTHBEARER',
             'oauth_cb': self._oauth_cb,
-            'client.id': f'pubsublite-python-{threading.current_thread().ident}',
-            'acks': 'all',
-            'retries': 5,
-            'max.in.flight.requests.per.connection': 1,
-            'enable.idempotence': True,
+            # 'client.id': f'pubsublite-python-{threading.current_thread().ident}',
+            # 'acks': 'all',
+            # 'retries': 5,
+            # 'max.in.flight.requests.per.connection': 1,
+            # 'enable.idempotence': True,
             # SSL configuration for MSAK connections
-            'ssl.endpoint.identification.algorithm': 'none',
-            'ssl.ca.location': 'probe',
+            # 'ssl.endpoint.identification.algorithm': 'none',
+            # 'ssl.ca.location': 'probe',
         }
         
         # Apply batch settings to producer config
