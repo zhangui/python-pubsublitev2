@@ -133,34 +133,27 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             message = self._create_kafka_message(data, ordering_key, **attrs)
             
             # Create a future for the async result
-            loop = asyncio.get_event_loop()
-            future = loop.create_future()
+            # loop = asyncio.get_event_loop()
+            # future = loop.create_future()
             
-            def delivery_callback(err, msg):
-                """Callback for Kafka message delivery."""
-                if err:
-                    # Map Kafka errors to GoogleAPICallError
-                    if not future.done():
-                        error_msg = f"Kafka delivery failed: {err}"
-                        future.set_exception(GoogleAPICallError(error_msg))
-                else:
-                    # Success - return message offset as ack ID
-                    if not future.done():
-                        ack_id = f"{msg.topic()}:{msg.partition()}:{msg.offset()}"
-                        future.set_result(ack_id)
+            def callback(error, message):
+                if error is not None:
+                    print(error)
+                    return
+                print("Delivered a message to {}[{}]".format(message.topic(), message.partition()))
             
             # Publish to Kafka with callback
             # print(self._topic_name)
             # print(**message)
             print("\n hahah")
             message=f"hello world!".encode('utf-8')
-            self._producer.produce("testtopic", message, callback=delivery_callback)
+            self._producer.produce("testtopic", message, callback=callback)
             
             # Poll for events in a non-blocking way
-            self._producer.poll(0)
+            
             
             # Wait for the callback to be executed
-            return await future
+            return await self._producer.poll(0)
             
         except Exception as e:
             raise GoogleAPICallError(f"Failed to publish message: {e}")
