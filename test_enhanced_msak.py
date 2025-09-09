@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test script for MSAK integration with real Google Cloud cluster."""
+"""Test EnhancedPublisherClient MSAK support using tokenprovider credentials."""
 
 from google.cloud.pubsublite.cloudpubsub.enhanced_publisher_client import EnhancedPublisherClient
 from google.cloud.pubsublite.transport import MSAKConfig
@@ -8,25 +8,26 @@ import time
 import sys
 
 def main():
-    print("🚀 Testing MSAK Publisher with real Google Cloud cluster...")
+    print("🚀 Testing EnhancedPublisherClient MSAK with tokenprovider credentials...")
     
     # Get credentials using tokenprovider style
     try:
         from tokenprovider import TokenProvider
         token_provider = TokenProvider()
         credentials = token_provider.get_credentials()
-        print(f"🔐 Using tokenprovider credentials for authentication")
+        print(f"✅ Obtained tokenprovider credentials")
+        print(f"   Credential type: {type(credentials).__name__}")
+        print(f"   Service account: {getattr(credentials, 'service_account_email', 'N/A')}")
     except Exception as e:
-        print(f"⚠️  Failed to get tokenprovider credentials: {e}")
-        print("   Falling back to default credentials")
-        credentials = None
+        print(f"❌ Failed to get tokenprovider credentials: {e}")
+        return 1
     
-    # Configure your cluster with credentials
+    # Configure cluster with tokenprovider credentials
     msak_config = MSAKConfig(
         project_id='ygnahz-eg-codelab',
         location='us-central1',
         cluster_id='testpsl',
-        credentials=credentials
+        credentials=credentials  # Pass tokenprovider credentials
     )
     
     topic_name = 'testtopic'
@@ -35,8 +36,8 @@ def main():
     print(f"📝 Topic: {topic_name}")
     
     try:
-        # Create client
-        print("🔧 Creating MSAK publisher client...")
+        # Create MSAK client with tokenprovider credentials
+        print("\n🔧 Creating EnhancedPublisherClient for MSAK...")
         client = EnhancedPublisherClient.create_for_msak(
             topic=topic_name,
             msak_config=msak_config,
@@ -47,22 +48,24 @@ def main():
         )
         
         print(f"✅ Client created successfully!")
+        print(f"   Client type: {type(client).__name__}")
         print(f"   Transport type: {client.transport_type}")
+        print(f"   Uses tokenprovider credentials: {msak_config.credentials is not None}")
         
-        # Test publishing
-        print("\n📤 Publishing test messages...")
+        # Test publishing with tokenprovider credentials
+        print("\n📤 Publishing test messages with tokenprovider auth...")
         with client:
             futures = []
             
-            for i in range(5):
-                message_data = f"Test message {i} from Python MSAK client at {time.strftime('%Y-%m-%d %H:%M:%S')}".encode('utf-8')
+            for i in range(3):
+                message_data = f"Enhanced client test message {i} with tokenprovider - {time.strftime('%Y-%m-%d %H:%M:%S')}".encode('utf-8')
                 
                 future = client.publish(
                     topic=topic_name,
                     data=message_data,
-                    ordering_key=f"test-key-{i % 2}",  # Alternates between two keys for partitioning
-                    message_type="test",
-                    sender="python-msak-client",
+                    ordering_key=f"enhanced-key-{i % 2}",
+                    message_type="enhanced_test",
+                    sender="enhanced-publisher-tokenprovider",
                     timestamp=str(int(time.time()))
                 )
                 
@@ -82,33 +85,30 @@ def main():
                 except Exception as e:
                     print(f"   ❌ Message {i} failed: {e}")
             
-            print(f"\n📊 Results: {success_count}/{len(futures)} messages published successfully")
+            print(f"\n📊 Results: {success_count}/{len(futures)} messages published")
             
-            # Flush any remaining messages
+            # Flush remaining messages
             print("🔄 Flushing remaining messages...")
             client.flush(timeout=10)
             
+            if success_count > 0:
+                print("\n🎉 SUCCESS! EnhancedPublisherClient with tokenprovider credentials works!")
+                return 0
+            else:
+                print("\n❌ No messages were successfully published")
+                return 1
+            
     except ImportError as e:
         print(f"❌ Missing dependencies: {e}")
-        print("💡 Install with: pip install google-cloud-pubsublite[msak]")
+        print("💡 Ensure confluent-kafka is installed")
         return 1
         
     except Exception as e:
         print(f"❌ Error: {e}")
-        print("\n🔍 Troubleshooting tips:")
-        print("   1. Ensure you're authenticated: gcloud auth application-default login")
-        print("   2. Verify your cluster exists: gcloud managed-kafka clusters list")
-        print("   3. Check topic exists: gcloud managed-kafka topics list --cluster=testpsl --location=us-central1")
-        print("   4. Ensure you have Kafka producer permissions")
-        print("\n⚠️  IMPORTANT: MSAK clusters are only accessible from within the VPC network.")
-        print("   If you're running this locally, you need to:")
-        print("   a) Run this from a Compute Engine VM in the same VPC as your MSAK cluster")
-        print("   b) Set up Cloud VPN or Cloud Interconnect to access the cluster")
-        print("   c) Use a bastion host or proxy to connect to the cluster")
+        print(f"   Exception type: {type(e).__name__}")
+        import traceback
+        print(f"   Full traceback:\n{traceback.format_exc()}")
         return 1
-    
-    print("\n🎉 Test completed successfully!")
-    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
