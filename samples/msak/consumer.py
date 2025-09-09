@@ -8,7 +8,7 @@ from tokenprovider import TokenProvider
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-b', '--bootstrap-servers', dest='bootstrap', type=str, required=True)
-parser.add_argument('-t', '--topic-name', dest='topic_name', type=str, default='example-topic')
+parser.add_argument('-t', '--topic-name', dest='topic_name', type=str, default='testtopic')
 parser.add_argument('--group-id', dest='group_id', type=str, default=f'cli-consumer-{uuid4()}')
 parser.add_argument('--auto-offset-reset', dest='auto_offset_reset', type=str, default='latest',
                     choices=['earliest', 'latest', 'error'])
