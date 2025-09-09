@@ -147,13 +147,13 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             # print(**message)
             print("\n hahah")
             message=f"hello world!".encode('utf-8')
-            self._producer.produce("testtopic", message, callback=callback)
+            
             
             # Poll for events in a non-blocking way
             
             
             # Wait for the callback to be executed
-            return await self._producer.poll(0)
+            return await self._producer.produce("testtopic", message, callback=callback)
             
         except Exception as e:
             raise GoogleAPICallError(f"Failed to publish message: {e}")
