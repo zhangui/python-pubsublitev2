@@ -141,10 +141,10 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             # Publish to Kafka with callback
             # print(self._topic_name)
             # print(**message)
-            # print("\n hahah")
-            # message=f"hello world!".encode('utf-8')
+            print("\n hahah")
+            message=f"hello world!".encode('utf-8')
             
-            return self._producer.produce("testtopic", **message, callback=callback)
+            return self._producer.produce("testtopic", message, callback=callback)
             
         except Exception as e:
             raise GoogleAPICallError(f"Failed to publish message: {e}")
