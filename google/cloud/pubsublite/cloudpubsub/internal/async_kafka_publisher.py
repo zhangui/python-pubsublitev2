@@ -130,7 +130,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             raise GoogleAPICallError("Publisher not started. Use async with statement.")
 
         try:
-            message = self._create_kafka_message(data, ordering_key, **attrs)
+            message = self._create_kafka_message(data, ordering_key, **attrs).encode('utf-8')
             
             def callback(error, message):
                 if error is not None:
@@ -142,7 +142,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             # print(self._topic_name)
             # print(**message)
             print("\n hahah")
-            message=f"hello world!".encode('utf-8')
+            # message=message
             
             return self._producer.produce("testtopic", message, callback=callback)
             
