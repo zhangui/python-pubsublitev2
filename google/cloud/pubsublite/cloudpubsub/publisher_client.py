@@ -50,12 +50,14 @@ from overrides import overrides
 try:
     from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import (
         KafkaConfig,
-        create_default_kafka_producer_config,
+        KafkaConfigBuilder,
+        create_oauth_token_callback,
     )
     KAFKA_AVAILABLE = True
 except ImportError:
     KafkaConfig = None
-    create_default_kafka_producer_config = None
+    KafkaConfigBuilder = None
+    create_oauth_token_callback = None
     KAFKA_AVAILABLE = False
 
 
@@ -82,28 +84,85 @@ def _determine_backend(use_kafka: Optional[bool]) -> bool:
 def _create_kafka_config(
     credentials: Optional[Credentials] = None,
     producer_config: Optional[Dict[str, Any]] = None,
+    batch_settings: Optional[BatchSettings] = None,
 ) -> KafkaConfig:
-    """Create a KafkaConfig with the provided parameters."""
+    """
+    Create a KafkaConfig with the provided parameters.
+    
+    Args:
+        credentials: Google Cloud credentials for OAuth authentication
+        producer_config: Complete Kafka producer configuration
+        batch_settings: Optional Pub/Sub Lite batch settings to convert
+    
+    Returns:
+        KafkaConfig instance
+    """
     if not KAFKA_AVAILABLE:
         raise ImportError(
             "Kafka functionality requested but confluent-kafka is not installed. "
             "Install with: pip install google-cloud-pubsublite[kafka]"
         )
     
-    # Validate that bootstrap.servers is provided
-    if not producer_config or 'bootstrap.servers' not in producer_config:
+    # Require explicit configuration
+    if not producer_config:
         raise ValueError(
-            "kafka_producer_config must contain 'bootstrap.servers' when using Kafka backend"
+            "kafka_producer_config is required when using Kafka backend. "
+            "Please provide a complete Kafka producer configuration including "
+            "'bootstrap.servers' and authentication settings."
         )
     
-    # Merge default config with user-provided config
-    default_config = create_default_kafka_producer_config()
-    final_config = default_config.copy()
-    final_config.update(producer_config)
+    # Validate required fields
+    if 'bootstrap.servers' not in producer_config:
+        raise ValueError(
+            "kafka_producer_config must contain 'bootstrap.servers'"
+        )
+    
+    # Validate authentication configuration
+    security_protocol = producer_config.get('security.protocol')
+    if security_protocol == 'SASL_SSL':
+        # Validate OAuth/SASL configuration
+        if 'sasl.mechanisms' not in producer_config:
+            raise ValueError(
+                "SASL_SSL requires 'sasl.mechanisms' to be specified"
+            )
+        if producer_config.get('sasl.mechanisms') == 'OAUTHBEARER':
+            if 'oauth_cb' not in producer_config:
+                # If no oauth_cb provided, create one using credentials
+                if credentials:
+                    producer_config['oauth_cb'] = create_oauth_token_callback(credentials)
+                else:
+                    raise ValueError(
+                        "OAUTHBEARER requires 'oauth_cb' token provider or credentials"
+                    )
+    elif security_protocol == 'SSL':
+        # Validate mTLS configuration
+        required_ssl_fields = [
+            'ssl.certificate.location',
+            'ssl.key.location', 
+            'ssl.ca.location'
+        ]
+        missing_fields = [f for f in required_ssl_fields if f not in producer_config]
+        if missing_fields:
+            raise ValueError(
+                f"mTLS configuration requires: {', '.join(missing_fields)}"
+            )
+    elif security_protocol is None:
+        raise ValueError(
+            "kafka_producer_config must specify 'security.protocol' "
+            "(e.g., 'SASL_SSL' for OAuth or 'SSL' for mTLS)"
+        )
+    
+    # Apply batch settings if provided
+    if batch_settings and KafkaConfigBuilder:
+        batch_config = KafkaConfigBuilder.from_batch_settings(batch_settings)
+        # Merge batch settings into producer config (user config takes precedence)
+        for key, value in batch_config.items():
+            if key not in producer_config:
+                producer_config[key] = value
     
     return KafkaConfig(
         credentials=credentials,
-        producer_config=final_config,
+        producer_config=producer_config,
     )
 
 
@@ -159,6 +218,7 @@ class PublisherClient(PublisherClientInterface, ConstructableFromServiceAccount)
             kafka_config = _create_kafka_config(
                 credentials=credentials,
                 producer_config=kafka_producer_config,
+                batch_settings=per_partition_batching_settings,
             )
         
         # Create implementation using the factory pattern
@@ -256,6 +316,7 @@ class AsyncPublisherClient(
             kafka_config = _create_kafka_config(
                 credentials=credentials,
                 producer_config=kafka_producer_config,
+                batch_settings=per_partition_batching_settings,
             )
 
         client_id = _get_client_id(enable_idempotence)

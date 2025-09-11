@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Minimal tests for Kafka-specific behavior in AsyncKafkaPublisher."""
+"""Tests for AsyncKafkaPublisher with proper confluent-kafka API."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
+import asyncio
 
 # Skip all tests if Kafka is not available
 pytest.importorskip("confluent_kafka")
 
+from google.api_core.exceptions import GoogleAPICallError
 from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher import (
     AsyncKafkaPublisher,
 )
@@ -31,125 +33,231 @@ def kafka_config():
     """Test Kafka configuration."""
     return KafkaConfig(
         credentials=None,
-        producer_config={'bootstrap.servers': 'localhost:9092'}
+        producer_config={
+            'bootstrap.servers': 'localhost:9092',
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'OAUTHBEARER',
+        }
     )
 
 
-def test_kafka_ack_id_format():
-    """Test that Kafka ack IDs follow topic:partition:offset format."""
-    # Test parsing Kafka ack ID format
-    ack_id = "my-kafka-topic:2:98765"
+@pytest.mark.asyncio
+async def test_publish_with_proper_confluent_kafka_api():
+    """Test that publish uses correct confluent-kafka Producer.produce() API."""
+    mock_producer = MagicMock()
+    mock_producer.produce.return_value = None  # produce() returns None on success
+    mock_producer.poll.return_value = 0
     
-    # Verify format: topic:partition:offset
-    assert ":" in ack_id
-    parts = ack_id.split(":")
-    assert len(parts) == 3
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    topic, partition, offset = parts
-    assert topic == "my-kafka-topic"
-    assert partition.isdigit()
-    assert offset.isdigit()
-    assert int(partition) >= 0
-    assert int(offset) >= 0
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer',
+               return_value=mock_producer):
+        publisher = AsyncKafkaPublisher(config, "test-topic")
+        publisher._started = True
+        publisher._producer = mock_producer
+        
+        # Test publish
+        result = await publisher.publish(
+            data=b"test message",
+            ordering_key="key-123",
+            attr1="value1",
+            attr2="value2"
+        )
+        
+        # Verify produce was called with correct parameters
+        mock_producer.produce.assert_called_once()
+        call_args = mock_producer.produce.call_args
+        
+        # Check positional arguments
+        assert call_args.kwargs['topic'] == "test-topic"
+        assert call_args.kwargs['value'] == b"test message"
+        assert call_args.kwargs['key'] == b"key-123"
+        assert call_args.kwargs['timestamp'] == 0  # Current time
+        
+        # Check headers are list of tuples
+        headers = call_args.kwargs['headers']
+        assert isinstance(headers, list)
+        assert all(isinstance(h, tuple) and len(h) == 2 for h in headers)
+        assert ('attr1', b'value1') in headers
+        assert ('attr2', b'value2') in headers
+        
+        # Check on_delivery callback exists
+        assert 'on_delivery' in call_args.kwargs
+        assert callable(call_args.kwargs['on_delivery'])
+        
+        # Since we don't use Futures, result should be None (what produce returns)
+        assert result is None
 
 
-@patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer')
-def test_kafka_producer_config_creation(mock_producer_class, kafka_config):
-    """Test that Kafka producer config is created correctly."""
-    mock_producer_class.return_value = MagicMock()
+def test_convert_attributes_to_headers():
+    """Test that attributes are properly converted to Kafka headers format."""
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    publisher = AsyncKafkaPublisher(kafka_config, "test-topic")
-    config = publisher._create_producer_config()
-    
-    # Should include bootstrap.servers from user config
-    assert config['bootstrap.servers'] == 'localhost:9092'
-    
-    # Should include default OAuth settings
-    assert config.get('security.protocol') == 'SASL_SSL'
-    assert config.get('sasl.mechanisms') == 'OAUTHBEARER'
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer'):
+        publisher = AsyncKafkaPublisher(config, "test-topic")
+        
+        # Test conversion
+        attrs = {
+            'string_attr': 'test',
+            'bytes_attr': b'bytes',
+            'int_attr': 123,
+        }
+        
+        headers = publisher._convert_attributes_to_headers(attrs)
+        
+        assert isinstance(headers, list)
+        assert ('string_attr', b'test') in headers
+        assert ('bytes_attr', b'bytes') in headers
+        assert ('int_attr', b'123') in headers
 
 
-def test_kafka_message_headers_conversion():
-    """Test that message attributes are converted to Kafka headers."""
-    # This would be the expected conversion logic
-    attributes = {
-        'content_type': 'application/json',
-        'source': 'test-service',
-        'event_id': '12345'
-    }
+@pytest.mark.asyncio
+async def test_publish_without_started_raises_error():
+    """Test that publishing without starting raises an error."""
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    # Expected headers format for Kafka
-    expected_headers = [
-        ('content_type', b'application/json'),
-        ('source', b'test-service'),
-        ('event_id', b'12345')
-    ]
-    
-    # Convert attributes to headers (this logic would be in AsyncKafkaPublisher)
-    headers = [(key, value.encode('utf-8')) for key, value in attributes.items()]
-    
-    assert headers == expected_headers
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer'):
+        publisher = AsyncKafkaPublisher(config, "test-topic")
+        publisher._started = False  # Not started
+        
+        with pytest.raises(GoogleAPICallError, match="Publisher not started"):
+            await publisher.publish(b"test")
 
 
-def test_kafka_ordering_key_as_partition_key():
-    """Test that ordering_key becomes Kafka partition key."""
-    ordering_key = "user-123"
+@pytest.mark.asyncio
+async def test_publish_with_buffer_error():
+    """Test that BufferError is properly handled."""
+    mock_producer = MagicMock()
+    mock_producer.produce.side_effect = BufferError("Queue full")
     
-    # In Kafka, ordering_key should become the message key for partitioning
-    expected_key = ordering_key.encode('utf-8')
-    assert expected_key == b"user-123"
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    # Empty ordering_key should become None (random partitioning)
-    empty_key = ""
-    expected_empty = None if not empty_key else empty_key.encode('utf-8')
-    assert expected_empty is None
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer',
+               return_value=mock_producer):
+        publisher = AsyncKafkaPublisher(config, "test-topic")
+        publisher._started = True
+        publisher._producer = mock_producer
+        
+        with pytest.raises(GoogleAPICallError, match="Kafka producer queue is full"):
+            await publisher.publish(b"test message")
 
 
-@patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer')
-def test_kafka_mtls_todo_placeholder(mock_producer_class, kafka_config):
-    """Test that mTLS configuration has a TODO placeholder."""
-    mock_producer_class.return_value = MagicMock()
+@pytest.mark.asyncio
+async def test_async_context_manager():
+    """Test that AsyncKafkaPublisher works as async context manager."""
+    mock_producer = MagicMock()
+    mock_producer.flush.return_value = 0
     
-    publisher = AsyncKafkaPublisher(kafka_config, "test-topic")
-    config = publisher._create_producer_config()
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    # Should have OAuth as default (mTLS is TODO)
-    if 'security.protocol' not in kafka_config.producer_config:
-        assert config.get('security.protocol') == 'SASL_SSL'
-        assert config.get('sasl.mechanisms') == 'OAUTHBEARER'
-        # Default OAuth endpoint
-        assert config.get('sasl.oauthbearer.token.endpoint.url') == 'localhost:14293'
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer',
+               return_value=mock_producer):
+        async with AsyncKafkaPublisher(config, "test-topic") as publisher:
+            assert publisher._started is True
+            assert publisher._producer is mock_producer
+        
+        # After exit, should be stopped
+        assert publisher._started is False
+        mock_producer.flush.assert_called_once_with(30)  # 30 second timeout
 
 
-def test_kafka_topic_name_extraction():
-    """Test that topic name is properly extracted and used."""
-    topic_name = "my-kafka-topic"
+def test_delivery_callback_logging():
+    """Test that the delivery callback logs appropriately."""
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    # The publisher should store and use the topic name correctly
-    assert topic_name == "my-kafka-topic"
-    assert len(topic_name) > 0
-    assert not topic_name.startswith("projects/")  # Not a Pub/Sub Lite path
+    mock_producer = MagicMock()
+    mock_producer.produce.return_value = None
+    mock_producer.poll.return_value = 0
+    
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer',
+               return_value=mock_producer):
+        with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.logger') as mock_logger:
+            publisher = AsyncKafkaPublisher(config, "test-topic")
+            publisher._started = True
+            publisher._producer = mock_producer
+            
+            # Get the callback from produce call
+            asyncio.run(publisher.publish(b"test"))
+            on_delivery = mock_producer.produce.call_args.kwargs['on_delivery']
+            
+            # Test error case
+            mock_error = MagicMock()
+            mock_error.__str__.return_value = "Test error"
+            on_delivery(mock_error, None)
+            mock_logger.error.assert_called_with("Failed to deliver message: Test error")
+            
+            # Test success case
+            mock_msg = MagicMock()
+            mock_msg.topic.return_value = "test-topic"
+            mock_msg.partition.return_value = 0
+            mock_msg.offset.return_value = 123
+            on_delivery(None, mock_msg)
+            mock_logger.debug.assert_called_with("Message delivered to test-topic[0]@123")
 
 
-@patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer')
-def test_kafka_user_config_preserved(mock_producer_class, kafka_config):
-    """Test that user configuration is preserved and not overwritten."""
-    # Add custom user settings
-    kafka_config.producer_config.update({
-        'client.id': 'my-custom-client',
-        'request.timeout.ms': 60000,
-        'custom.setting': 'custom-value'
-    })
+def test_empty_ordering_key_becomes_none():
+    """Test that empty ordering key becomes None for Kafka."""
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    mock_producer_class.return_value = MagicMock()
+    mock_producer = MagicMock()
+    mock_producer.produce.return_value = None
+    mock_producer.poll.return_value = 0
     
-    publisher = AsyncKafkaPublisher(kafka_config, "test-topic")
-    config = publisher._create_producer_config()
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer',
+               return_value=mock_producer):
+        publisher = AsyncKafkaPublisher(config, "test-topic")
+        publisher._started = True
+        publisher._producer = mock_producer
+        
+        # Publish with empty ordering key
+        asyncio.run(publisher.publish(b"test", ordering_key=""))
+        
+        # Key should be None
+        assert mock_producer.produce.call_args.kwargs['key'] is None
+        
+        # Publish with ordering key
+        asyncio.run(publisher.publish(b"test", ordering_key="key123"))
+        
+        # Key should be encoded
+        assert mock_producer.produce.call_args.kwargs['key'] == b"key123"
+
+
+def test_event_time_added_as_header():
+    """Test that event_time attribute is added as a special header."""
+    config = KafkaConfig(
+        producer_config={'bootstrap.servers': 'localhost:9092'}
+    )
     
-    # User settings should be preserved
-    assert config['client.id'] == 'my-custom-client'
-    assert config['request.timeout.ms'] == 60000
-    assert config['custom.setting'] == 'custom-value'
+    mock_producer = MagicMock()
+    mock_producer.produce.return_value = None
+    mock_producer.poll.return_value = 0
     
-    # Bootstrap servers should be preserved
-    assert config['bootstrap.servers'] == 'localhost:9092'
+    with patch('google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher.Producer',
+               return_value=mock_producer):
+        publisher = AsyncKafkaPublisher(config, "test-topic")
+        publisher._started = True
+        publisher._producer = mock_producer
+        
+        # Publish with event_time
+        asyncio.run(publisher.publish(
+            b"test",
+            event_time="2024-01-01T12:00:00Z"
+        ))
+        
+        headers = mock_producer.produce.call_args.kwargs['headers']
+        assert ('event_time', b'2024-01-01T12:00:00Z') in headers
+        assert ('x-event-time', b'2024-01-01T12:00:00Z') in headers

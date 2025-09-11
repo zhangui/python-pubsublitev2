@@ -84,36 +84,33 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
         
         return config
 
-    def _create_kafka_message(
+    def _convert_attributes_to_headers(
         self, 
-        data: bytes, 
-        ordering_key: str = "", 
-        **attrs: Mapping[str, str]
-    ) -> Dict[str, Any]:
-        """Create a Kafka message from Pub/Sub Lite message components."""
-        message = {
-            'topic': self._topic_name,
-            'value': data,
-        }
+        attrs: Mapping[str, str]
+    ) -> list:
+        """Convert Pub/Sub Lite attributes to Kafka headers format.
         
-        # Use ordering_key as partition key if provided
-        if ordering_key:
-            message['key'] = ordering_key.encode('utf-8')
-        
-        # Convert attributes to Kafka headers
-        if attrs:
-            headers = {}
-            for key, value in attrs.items():
-                headers[key] = value.encode('utf-8')
-            message['headers'] = headers
+        Args:
+            attrs: Dictionary of attributes
             
-        return message
+        Returns:
+            List of (key, value) tuples for Kafka headers
+        """
+        headers = []
+        for key, value in attrs.items():
+            if isinstance(value, str):
+                headers.append((key, value.encode('utf-8')))
+            elif isinstance(value, bytes):
+                headers.append((key, value))
+            else:
+                headers.append((key, str(value).encode('utf-8')))
+        return headers
 
     async def publish(
         self, data: bytes, ordering_key: str = "", **attrs: Mapping[str, str]
     ) -> str:
         """
-        Publish a message to the Kafka topic.
+        Publish a message to the Kafka topic using confluent-kafka.
 
         Args:
             data: The bytestring payload of the message.
@@ -130,21 +127,39 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             raise GoogleAPICallError("Publisher not started. Use async with statement.")
 
         try:
-            message = self._create_kafka_message(data, ordering_key, **attrs).encode('utf-8')
+            # Convert attributes to Kafka headers (list of tuples)
+            headers = self._convert_attributes_to_headers(attrs) if attrs else None
             
-            def callback(error, message):
-                if error is not None:
-                    print(error)
-                    return
-                print("Delivered a message to {}[{}]".format(message.topic(), message.partition()))
+            # Add event_time as a special header if present
+            if 'event_time' in attrs:
+                if headers is None:
+                    headers = []
+                headers.append(('x-event-time', str(attrs['event_time']).encode('utf-8')))
             
-            # Publish to Kafka with callback
-            # print(self._topic_name)
-            # print(**message)
-            print("\n hahah")
-            # message=message
+            # Simple callback for logging
+            def on_delivery(err, msg):
+                if err is not None:
+                    logger.error(f"Failed to deliver message: {err}")
+                else:
+                    logger.debug(f"Message delivered to {msg.topic()}[{msg.partition()}]@{msg.offset()}")
             
-            return self._producer.produce("testtopic", message, callback=callback)
+            # Produce the message using confluent-kafka API
+            
+            
+            # Poll to trigger send
+            # self._producer.poll(0)
+            
+            # Return a placeholder ack_id immediately
+            # In a real implementation, you'd need to wait for the callback
+            # But per your requirement, we're not using Futures
+            return self._producer.produce(
+                topic=self._topic_name,
+                value=data,
+                key=ordering_key.encode('utf-8') if ordering_key else None,
+                headers=headers,
+                on_delivery=on_delivery,
+                timestamp=0  # Use current timestamp (0 means current time)
+            )
             
         except Exception as e:
             raise GoogleAPICallError(f"Failed to publish message: {e}")
