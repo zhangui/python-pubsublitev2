@@ -17,7 +17,16 @@ config = {
     'oauth_cb': token_provider.get_token,
 }
 
-producer = confluent_kafka.Producer(config)
+mtls_config={
+    'bootstrap.servers': args.bootstrap,
+    'security.protocol': 'SSL',
+    'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
+    # 'ssl.certificate.location': '/path/to/client.crt',
+    # 'ssl.ca.location': '/path/to/ca.crt',
+    'ssl.keystore.password': 'keystorepass',
+}
+
+producer = confluent_kafka.Producer(mtls_config)
 
 def callback(error, message):
     if error is not None:

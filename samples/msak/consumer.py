@@ -39,9 +39,9 @@ mtls_config={
             # 'ssl.ca.location': '/path/to/ca.crt',
             'ssl.keystore.password': 'keystorepass',
 
-            'group.id': args.group_id,
-    'auto.offset.reset': args.auto_offset_reset,
-    'enable.partition.eof': True,  # surface EOF events per partition
+        'group.id': args.group_id,
+        'auto.offset.reset': args.auto_offset_reset,
+        'enable.partition.eof': True,  # surface EOF events per partition
     }
 
 consumer = Consumer(mtls_config)
