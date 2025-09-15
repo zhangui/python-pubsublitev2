@@ -31,7 +31,20 @@ config = {
     # 'enable.auto.commit': True,  # default True; uncomment to be explicit
 }
 
-consumer = Consumer(config)
+mtls_config={
+            'bootstrap.servers': args.bootstrap,
+            'security.protocol': 'SSL',
+            'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
+            # 'ssl.certificate.location': '/path/to/client.crt',
+            # 'ssl.ca.location': '/path/to/ca.crt',
+            'ssl.key.password': 'keystorepass',
+
+            'group.id': args.group_id,
+    'auto.offset.reset': args.auto_offset_reset,
+    'enable.partition.eof': True,  # surface EOF events per partition
+    }
+
+consumer = Consumer(mtls_config)
 
 def fmt_ts(ts_ms: int | None) -> str:
     if not ts_ms:
