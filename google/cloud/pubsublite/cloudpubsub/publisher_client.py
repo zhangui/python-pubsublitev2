@@ -137,9 +137,7 @@ def _create_kafka_config(
     elif security_protocol == 'SSL':
         # Validate mTLS configuration
         required_ssl_fields = [
-            'ssl.certificate.location',
-            'ssl.key.location', 
-            'ssl.ca.location'
+            'ssl.keystore.location',
         ]
         missing_fields = [f for f in required_ssl_fields if f not in producer_config]
         if missing_fields:
