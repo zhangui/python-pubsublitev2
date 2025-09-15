@@ -32,7 +32,6 @@ import time
 import json
 import logging
 from datetime import timedelta
-
 from tokenprovider import TokenProvider
 
 logger = logging.getLogger(__name__)

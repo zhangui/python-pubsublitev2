@@ -25,6 +25,7 @@ import argparse
 import sys
 import os
 import time
+from tokenprovider import TokenProvider
 
 # Add the parent directory to sys.path for development usage
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
@@ -85,6 +86,7 @@ def publish_batch_simple(
     })
     
     # Create Publisher Client
+    token_provider = TokenProvider()
     client = PublisherClient(
         use_kafka=True,
         kafka_producer_config={
