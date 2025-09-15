@@ -37,7 +37,7 @@ mtls_config={
             'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
             # 'ssl.certificate.location': '/path/to/client.crt',
             # 'ssl.ca.location': '/path/to/ca.crt',
-            'ssl.key.password': 'keystorepass',
+            'ssl.keystore.password': 'keystorepass',
 
             'group.id': args.group_id,
     'auto.offset.reset': args.auto_offset_reset,

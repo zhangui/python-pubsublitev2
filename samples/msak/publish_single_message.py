@@ -76,7 +76,7 @@ def publish_single_message(
             'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
             # 'ssl.certificate.location': '/path/to/client.crt',
             # 'ssl.ca.location': '/path/to/ca.crt',
-            'ssl.key.password': 'keystorepass'
+            'ssl.keystore.password': 'keystorepass'
     }
     
     # Configure and create Publisher Client with Kafka backend
