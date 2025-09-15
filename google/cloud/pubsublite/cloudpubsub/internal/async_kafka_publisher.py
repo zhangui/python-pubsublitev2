@@ -163,16 +163,14 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
 
             # Poll until delivery callback is triggered
             # This blocks but is necessary to get the ack_id
-            while self._ack_id is None and self._delivery_error is None:
-                self._producer.poll(0)  # Poll for 10ms
+            # while self._ack_id is None and self._delivery_error is None:
+            #       # Poll for 10ms
 
-            if self._delivery_error:
-                raise self._delivery_error
+            # if self._delivery_error:
+            #     raise self._delivery_error
 
-            return self._ack_id
+            return await self._producer.poll(0)
 
-        except BufferError as e:
-            raise GoogleAPICallError(f"Kafka producer queue is full: {e}")
         except Exception as e:
             if isinstance(e, GoogleAPICallError):
                 raise  # Re-raise delivery errors as-is
