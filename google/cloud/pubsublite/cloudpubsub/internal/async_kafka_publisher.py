@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import logging
 from typing import Mapping, Optional, Dict, Any
 
@@ -60,6 +59,8 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
         self._topic_name = topic_name
         self._producer: Optional[Producer] = None
         self._started = False
+        self._ack_id: Optional[str] = None
+        self._delivery_error: Optional[Exception] = None
 
     def _create_producer_config(self) -> Dict[str, Any]:
         """Create the confluent-kafka Producer configuration."""
@@ -129,20 +130,27 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
         try:
             # Convert attributes to Kafka headers (list of tuples)
             headers = self._convert_attributes_to_headers(attrs) if attrs else None
-            
+
             # Add event_time as a special header if present
             if 'event_time' in attrs:
                 if headers is None:
                     headers = []
                 headers.append(('x-event-time', str(attrs['event_time']).encode('utf-8')))
-            
-            # Simple callback for logging
+
+            # Reset state for this publish
+            self._ack_id = None
+            self._delivery_error = None
+
             def on_delivery(err, msg):
+                """Delivery report callback."""
                 if err is not None:
+                    self._delivery_error = GoogleAPICallError(f"Failed to deliver message: {err}")
                     logger.error(f"Failed to deliver message: {err}")
                 else:
+                    # Success - format ack_id as topic:partition:offset
+                    self._ack_id = f"{msg.topic()}:{msg.partition()}:{msg.offset()}"
                     logger.debug(f"Message delivered to {msg.topic()}[{msg.partition()}]@{msg.offset()}")
-            
+
             # Produce the message using confluent-kafka API
             self._producer.produce(
                 topic=self._topic_name,
@@ -152,27 +160,31 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 on_delivery=on_delivery,
                 timestamp=0  # Use current timestamp (0 means current time)
             )
-            
-            # Poll to trigger send
-            
-            
-            # Return a placeholder ack_id immediately
-            # In a real implementation, you'd need to wait for the callback
-            # But per your requirement, we're not using Futures
-            # Return format: topic:pending:timestamp
-            # import time
-            return self._producer.poll(0)
-            
+
+            # Poll until delivery callback is triggered
+            # This blocks but is necessary to get the ack_id
+            while self._ack_id is None and self._delivery_error is None:
+                self._producer.poll(0.01)  # Poll for 10ms
+
+            if self._delivery_error:
+                raise self._delivery_error
+
+            return self._ack_id
+
+        except BufferError as e:
+            raise GoogleAPICallError(f"Kafka producer queue is full: {e}")
         except Exception as e:
+            if isinstance(e, GoogleAPICallError):
+                raise  # Re-raise delivery errors as-is
             raise GoogleAPICallError(f"Failed to publish message: {e}")
 
     async def __aenter__(self):
         """Start the Kafka producer client."""
         if self._started:
             return self
-            
+
         try:
-            # producer_config = self._create_producer_config()
+            # Create the producer
             self._producer = Producer(self._kafka_config.producer_config)
             self._started = True
             logger.info(f"Kafka producer started for topic: {self._topic_name}")
@@ -184,7 +196,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
         """Stop the Kafka producer client and flush pending messages."""
         if not self._started:
             return
-            
+
         try:
             if self._producer:
                 # Flush any pending messages (wait up to 30 seconds)
@@ -192,6 +204,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 if remaining is not None and remaining > 0:
                     logger.warning(f"Failed to flush {remaining} messages on shutdown")
                 self._producer = None
+
             self._started = False
             logger.info(f"Kafka producer stopped for topic: {self._topic_name}")
         except Exception as e:
