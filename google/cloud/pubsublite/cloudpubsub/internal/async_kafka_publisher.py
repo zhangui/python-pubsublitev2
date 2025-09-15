@@ -171,8 +171,6 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 timestamp=0  # Use current timestamp (0 means current time)
             )
 
-        except BufferError as e:
-            raise GoogleAPICallError(f"Kafka producer queue is full: {e}")
         except Exception as e:
             if isinstance(e, GoogleAPICallError):
                 raise  # Re-raise delivery errors as-is
