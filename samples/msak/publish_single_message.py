@@ -82,7 +82,7 @@ def publish_single_message(
     # Configure and create Publisher Client with Kafka backend
     client = PublisherClient(
         use_kafka=True,
-        kafka_producer_config=producer_mtls_config
+        kafka_producer_config=producer_oath_config
     )
     
     print(f"Using backend: kafka")
