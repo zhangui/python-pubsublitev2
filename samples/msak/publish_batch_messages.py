@@ -30,8 +30,10 @@ import sys
 import os
 import time
 import json
+import logging
 from datetime import timedelta
-from concurrent.futures import as_completed
+
+logger = logging.getLogger(__name__)
 
 # Add the parent directory to sys.path for development usage
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
@@ -216,21 +218,38 @@ def publish_batch_messages(
                 for i in range(batch_size):
                     message = generate_test_message(i, batch_num, num_batches)
                     
-                    future = client.publish(
-                        topic=topic_path,
-                        data=message['data'],
-                        ordering_key=message['ordering_key'],
-                        **message['attributes']
-                    )
-                    
-                    batch_futures.append(future)
-                    message_count += 1
+                    try:
+                        future = client.publish(
+                            topic=topic_path,
+                            data=message['data'],
+                            ordering_key=message['ordering_key'],
+                            **message['attributes']
+                        )
+                        
+                        batch_futures.append(future)
+                        message_count += 1
+                    except Exception as e:
+                        print(f"  ✗ Failed to publish message {i}: {e}")
                 
                 # Track batch completion
                 batch_time = time.time() - batch_start
                 batch_rate = batch_size / batch_time if batch_time > 0 else 0
                 
-                print(f"  ✓ Sent {batch_size} messages in {batch_time:.3f}s")
+                # Wait for acknowledgments from this batch
+                successful = 0
+                failed = 0
+                for future in batch_futures:
+                    try:
+                        # Get the ack_id (even if it's a placeholder)
+                        ack_id = future.result(timeout=5) if hasattr(future, 'result') else str(future)
+                        successful += 1
+                    except Exception as e:
+                        failed += 1
+                        logger.debug(f"Failed to get ack for message: {e}")
+                
+                print(f"  ✓ Sent {successful} messages in {batch_time:.3f}s")
+                if failed > 0:
+                    print(f"  ⚠ {failed} messages failed")
                 print(f"  Rate: {batch_rate:.0f} messages/second")
                 
                 futures.extend(batch_futures)

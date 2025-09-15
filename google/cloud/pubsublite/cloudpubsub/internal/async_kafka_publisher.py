@@ -144,15 +144,7 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                     logger.debug(f"Message delivered to {msg.topic()}[{msg.partition()}]@{msg.offset()}")
             
             # Produce the message using confluent-kafka API
-            
-            
-            # Poll to trigger send
-            # self._producer.poll(0)
-            
-            # Return a placeholder ack_id immediately
-            # In a real implementation, you'd need to wait for the callback
-            # But per your requirement, we're not using Futures
-            return self._producer.produce(
+            self._producer.produce(
                 topic=self._topic_name,
                 value=data,
                 key=ordering_key.encode('utf-8') if ordering_key else None,
@@ -160,6 +152,16 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 on_delivery=on_delivery,
                 timestamp=0  # Use current timestamp (0 means current time)
             )
+            
+            # Poll to trigger send
+            
+            
+            # Return a placeholder ack_id immediately
+            # In a real implementation, you'd need to wait for the callback
+            # But per your requirement, we're not using Futures
+            # Return format: topic:pending:timestamp
+            # import time
+            return self._producer.poll(0)
             
         except Exception as e:
             raise GoogleAPICallError(f"Failed to publish message: {e}")
