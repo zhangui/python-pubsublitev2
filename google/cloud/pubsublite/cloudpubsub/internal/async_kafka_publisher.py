@@ -152,7 +152,17 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                     logger.debug(f"Message delivered to {msg.topic()}[{msg.partition()}]@{msg.offset()}")
 
             # Produce the message using confluent-kafka API
-            self._producer.produce(
+            
+
+            # Poll until delivery callback is triggered
+            # This blocks but is necessary to get the ack_id
+            # while self._ack_id is None and self._delivery_error is None:
+            #     self._producer.poll(0.01)  # Poll for 10ms
+
+            # if self._delivery_error:
+            #     raise self._delivery_error
+
+            return self._producer.produce(
                 topic=self._topic_name,
                 value=data,
                 key=ordering_key.encode('utf-8') if ordering_key else None,
@@ -160,16 +170,6 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 on_delivery=on_delivery,
                 timestamp=0  # Use current timestamp (0 means current time)
             )
-
-            # Poll until delivery callback is triggered
-            # This blocks but is necessary to get the ack_id
-            while self._ack_id is None and self._delivery_error is None:
-                self._producer.poll(0.01)  # Poll for 10ms
-
-            if self._delivery_error:
-                raise self._delivery_error
-
-            return self._ack_id
 
         except BufferError as e:
             raise GoogleAPICallError(f"Kafka producer queue is full: {e}")
