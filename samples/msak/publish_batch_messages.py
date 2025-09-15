@@ -33,6 +33,8 @@ import json
 import logging
 from datetime import timedelta
 
+from tokenprovider import TokenProvider
+
 logger = logging.getLogger(__name__)
 
 # Add the parent directory to sys.path for development usage
@@ -191,11 +193,15 @@ def publish_batch_messages(
     print()
     
     # Create Publisher Client
+    token_provider = TokenProvider()
     client = PublisherClient(
         use_kafka=True,
-        kafka_producer_config=kafka_config,
-        per_partition_batching_settings=batch_settings,
-        enable_idempotence=True
+        kafka_producer_config={
+            'bootstrap.servers': bootstrap_servers,
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'OAUTHBEARER',
+            'oauth_cb': token_provider.get_token,
+        }
     )
     
     try:

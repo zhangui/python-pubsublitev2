@@ -87,8 +87,12 @@ def publish_batch_simple(
     # Create Publisher Client
     client = PublisherClient(
         use_kafka=True,
-        kafka_producer_config=kafka_config,
-        credentials=credentials
+        kafka_producer_config={
+            'bootstrap.servers': bootstrap_servers,
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'OAUTHBEARER',
+            'oauth_cb': token_provider.get_token,
+        }
     )
     
     try:
