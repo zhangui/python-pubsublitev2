@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import logging
 from typing import Mapping, Optional, Dict, Any
 
@@ -107,6 +108,45 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 headers.append((key, str(value).encode('utf-8')))
         return headers
 
+    def _prepare_headers(self, attrs: Mapping[str, str]) -> Optional[list]:
+        """Prepare Kafka headers from attributes."""
+        if not attrs:
+            return None
+
+        headers = self._convert_attributes_to_headers(attrs)
+
+        # Add event_time as a special header if present
+        if 'event_time' in attrs:
+            headers.append(('x-event-time', str(attrs['event_time']).encode('utf-8')))
+
+        return headers
+
+    def _create_delivery_callback(self):
+        """Create a delivery callback that sets instance variables."""
+        def on_delivery(err, msg):
+            """Delivery report callback."""
+            if err is not None:
+                self._delivery_error = GoogleAPICallError(f"Failed to deliver message: {err}")
+                logger.error(f"Failed to deliver message: {err}")
+            else:
+                # Success - format ack_id as topic:partition:offset
+                self._ack_id = f"{msg.topic()}:{msg.partition()}:{msg.offset()}"
+                logger.debug(f"Message delivered to {msg.topic()}[{msg.partition()}]@{msg.offset()}")
+        return on_delivery
+
+    async def _wait_for_delivery(self) -> str:
+        """Wait for message delivery by polling the producer."""
+        # Poll until delivery callback is triggered
+        while self._ack_id is None and self._delivery_error is None:
+            self._producer.poll(0.01)  # Poll for 10ms
+            # Yield control to allow other async tasks to run
+            await asyncio.sleep(0)
+
+        if self._delivery_error:
+            raise self._delivery_error
+
+        return self._ack_id
+
     async def publish(
         self, data: bytes, ordering_key: str = "", **attrs: Mapping[str, str]
     ) -> str:
@@ -128,49 +168,30 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
             raise GoogleAPICallError("Publisher not started. Use async with statement.")
 
         try:
-            # Convert attributes to Kafka headers (list of tuples)
-            headers = self._convert_attributes_to_headers(attrs) if attrs else None
-
-            # Add event_time as a special header if present
-            if 'event_time' in attrs:
-                if headers is None:
-                    headers = []
-                headers.append(('x-event-time', str(attrs['event_time']).encode('utf-8')))
-
             # Reset state for this publish
             self._ack_id = None
             self._delivery_error = None
 
-            def on_delivery(err, msg):
-                """Delivery report callback."""
-                if err is not None:
-                    self._delivery_error = GoogleAPICallError(f"Failed to deliver message: {err}")
-                    logger.error(f"Failed to deliver message: {err}")
-                else:
-                    # Success - format ack_id as topic:partition:offset
-                    self._ack_id = f"{msg.topic()}:{msg.partition()}:{msg.offset()}"
-                    logger.debug(f"Message delivered to {msg.topic()}[{msg.partition()}]@{msg.offset()}")
+            # Prepare the message components
+            headers = self._prepare_headers(attrs)
+            key = ordering_key.encode('utf-8') if ordering_key else None
+            callback = self._create_delivery_callback()
 
-            # Produce the message using confluent-kafka API
+            # Produce the message to Kafka
             self._producer.produce(
                 topic=self._topic_name,
                 value=data,
-                key=ordering_key.encode('utf-8') if ordering_key else None,
+                key=key,
                 headers=headers,
-                on_delivery=on_delivery,
-                timestamp=0  # Use current timestamp (0 means current time)
+                on_delivery=callback,
+                timestamp=0  # Use current timestamp
             )
 
-            # Poll until delivery callback is triggered
-            # This blocks but is necessary to get the ack_id
-            # while self._ack_id is None and self._delivery_error is None:
-            #       # Poll for 10ms
+            # Wait for delivery confirmation
+            return await self._wait_for_delivery()
 
-            # if self._delivery_error:
-            #     raise self._delivery_error
-
-            return await self._producer.poll(0)
-
+        except BufferError as e:
+            raise GoogleAPICallError(f"Kafka producer queue is full: {e}")
         except Exception as e:
             if isinstance(e, GoogleAPICallError):
                 raise  # Re-raise delivery errors as-is
