@@ -33,21 +33,24 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
     def __init__(
         self,
         *,
-        producer_config: Dict[str, Any],
+        producer_config: Dict[str, Any] = None,
         **kwargs
     ) -> None:
         """Initialize Kafka transport.
 
         Args:
             producer_config: Kafka producer configuration dict
-            **kwargs: Additional arguments (ignored, for compatibility with base)
+            **kwargs: Additional arguments passed to base transport
         """
         # Skip credential loading (Kafka handles auth via producer_config)
         self._ignore_credentials = True
-        super().__init__(**kwargs)
 
+        # Store producer_config before calling super (base doesn't accept it)
         self._producer_config = producer_config
         self._publishers = {}  # Cache: topic_name -> AsyncKafkaPublisher
+
+        # Call base __init__ without producer_config
+        super().__init__(**kwargs)
 
     @property
     def publish(
