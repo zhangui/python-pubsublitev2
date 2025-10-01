@@ -20,11 +20,20 @@ from .base import PublisherServiceTransport
 from .grpc import PublisherServiceGrpcTransport
 from .grpc_asyncio import PublisherServiceGrpcAsyncIOTransport
 
+# Optional Kafka transport
+try:
+    from .kafka import PublisherServiceKafkaTransport
+    HAS_KAFKA_TRANSPORT = True
+except ImportError:
+    HAS_KAFKA_TRANSPORT = False
+
 
 # Compile a registry of transports.
 _transport_registry = OrderedDict()  # type: Dict[str, Type[PublisherServiceTransport]]
 _transport_registry["grpc"] = PublisherServiceGrpcTransport
 _transport_registry["grpc_asyncio"] = PublisherServiceGrpcAsyncIOTransport
+if HAS_KAFKA_TRANSPORT:
+    _transport_registry["kafka"] = PublisherServiceKafkaTransport
 
 __all__ = (
     "PublisherServiceTransport",

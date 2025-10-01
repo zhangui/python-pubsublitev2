@@ -69,6 +69,15 @@ from .transports.base import PublisherServiceTransport, DEFAULT_CLIENT_INFO
 from .transports.grpc import PublisherServiceGrpcTransport
 from .transports.grpc_asyncio import PublisherServiceGrpcAsyncIOTransport
 
+# Optional Kafka imports
+try:
+    from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+    from .transports.kafka import PublisherServiceKafkaTransport
+    HAS_KAFKA = True
+except ImportError:
+    HAS_KAFKA = False
+    KafkaConfig = None  # type: ignore
+
 
 class PublisherServiceClientMeta(type):
     """Metaclass for the PublisherService client.
@@ -83,6 +92,8 @@ class PublisherServiceClientMeta(type):
     )  # type: Dict[str, Type[PublisherServiceTransport]]
     _transport_registry["grpc"] = PublisherServiceGrpcTransport
     _transport_registry["grpc_asyncio"] = PublisherServiceGrpcAsyncIOTransport
+    if HAS_KAFKA:
+        _transport_registry["kafka"] = PublisherServiceKafkaTransport
 
     def get_transport_class(
         cls,
@@ -525,6 +536,7 @@ class PublisherServiceClient(metaclass=PublisherServiceClientMeta):
         ] = None,
         client_options: Optional[Union[client_options_lib.ClientOptions, dict]] = None,
         client_info: gapic_v1.client_info.ClientInfo = DEFAULT_CLIENT_INFO,
+        kafka_config: Optional["KafkaConfig"] = None,
     ) -> None:
         """Instantiates the publisher service client.
 
@@ -570,6 +582,8 @@ class PublisherServiceClient(metaclass=PublisherServiceClientMeta):
                 API requests. If ``None``, then default info will be used.
                 Generally, you only need to set this if you're developing
                 your own client library.
+            kafka_config (Optional[KafkaConfig]): Kafka configuration for
+                using Kafka transport. Required when transport="kafka".
 
         Raises:
             google.auth.exceptions.MutualTLSChannelError: If mutual TLS transport
@@ -660,17 +674,21 @@ class PublisherServiceClient(metaclass=PublisherServiceClientMeta):
                 else cast(Callable[..., PublisherServiceTransport], transport)
             )
             # initialize with the provided callable or the passed in class
-            self._transport = transport_init(
-                credentials=credentials,
-                credentials_file=self._client_options.credentials_file,
-                host=self._api_endpoint,
-                scopes=self._client_options.scopes,
-                client_cert_source_for_mtls=self._client_cert_source,
-                quota_project_id=self._client_options.quota_project_id,
-                client_info=client_info,
-                always_use_jwt_access=True,
-                api_audience=self._client_options.api_audience,
-            )
+            transport_kwargs = {
+                "credentials": credentials,
+                "credentials_file": self._client_options.credentials_file,
+                "host": self._api_endpoint,
+                "scopes": self._client_options.scopes,
+                "client_cert_source_for_mtls": self._client_cert_source,
+                "quota_project_id": self._client_options.quota_project_id,
+                "client_info": client_info,
+                "always_use_jwt_access": True,
+                "api_audience": self._client_options.api_audience,
+            }
+            # Add kafka_config if provided (only used by Kafka transport)
+            if kafka_config is not None:
+                transport_kwargs["kafka_config"] = kafka_config
+            self._transport = transport_init(**transport_kwargs)
 
         if "async" not in str(self._transport):
             if CLIENT_LOGGING_SUPPORTED and _LOGGER.isEnabledFor(

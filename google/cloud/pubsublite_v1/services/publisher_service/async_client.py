@@ -54,6 +54,14 @@ from .transports.base import PublisherServiceTransport, DEFAULT_CLIENT_INFO
 from .transports.grpc_asyncio import PublisherServiceGrpcAsyncIOTransport
 from .client import PublisherServiceClient
 
+# Optional Kafka imports
+try:
+    from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+    HAS_KAFKA = True
+except ImportError:
+    HAS_KAFKA = False
+    KafkaConfig = None  # type: ignore
+
 try:
     from google.api_core import client_logging  # type: ignore
 
@@ -216,6 +224,7 @@ class PublisherServiceAsyncClient:
         ] = "grpc_asyncio",
         client_options: Optional[ClientOptions] = None,
         client_info: gapic_v1.client_info.ClientInfo = DEFAULT_CLIENT_INFO,
+        kafka_config: Optional["KafkaConfig"] = None,
     ) -> None:
         """Instantiates the publisher service async client.
 
@@ -261,6 +270,8 @@ class PublisherServiceAsyncClient:
                 API requests. If ``None``, then default info will be used.
                 Generally, you only need to set this if you're developing
                 your own client library.
+            kafka_config (Optional[KafkaConfig]): Kafka configuration for
+                using Kafka transport. Required when transport="kafka".
 
         Raises:
             google.auth.exceptions.MutualTlsChannelError: If mutual TLS transport
@@ -271,6 +282,7 @@ class PublisherServiceAsyncClient:
             transport=transport,
             client_options=client_options,
             client_info=client_info,
+            kafka_config=kafka_config,
         )
 
         if CLIENT_LOGGING_SUPPORTED and _LOGGER.isEnabledFor(
