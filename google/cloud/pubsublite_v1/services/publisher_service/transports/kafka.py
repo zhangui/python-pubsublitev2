@@ -16,11 +16,9 @@
 """Kafka transport for PublisherService."""
 
 import asyncio
-from typing import Callable, Iterator
+from typing import Callable, Iterator, Dict, Any
 from google.cloud.pubsublite_v1.types import publisher
 from google.longrunning import operations_pb2
-from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
-from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher import AsyncKafkaPublisher
 from .base import PublisherServiceTransport
 
 
@@ -35,20 +33,20 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
     def __init__(
         self,
         *,
-        kafka_config: KafkaConfig,
+        producer_config: Dict[str, Any],
         **kwargs
     ) -> None:
         """Initialize Kafka transport.
 
         Args:
-            kafka_config: Kafka configuration with bootstrap servers and auth
+            producer_config: Kafka producer configuration dict
             **kwargs: Additional arguments (ignored, for compatibility with base)
         """
-        # Skip credential loading (Kafka handles auth via kafka_config)
+        # Skip credential loading (Kafka handles auth via producer_config)
         self._ignore_credentials = True
         super().__init__(**kwargs)
 
-        self._kafka_config = kafka_config
+        self._producer_config = producer_config
         self._publishers = {}  # Cache: topic_name -> AsyncKafkaPublisher
 
     @property
@@ -82,7 +80,11 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
 
                     # Get or create publisher for this topic
                     if topic_name not in self._publishers:
-                        kafka_pub = AsyncKafkaPublisher(self._kafka_config, topic_name)
+                        from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+                        from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher import AsyncKafkaPublisher
+
+                        kafka_config = KafkaConfig(producer_config=self._producer_config)
+                        kafka_pub = AsyncKafkaPublisher(kafka_config, topic_name)
                         asyncio.run(kafka_pub.__aenter__())
                         self._publishers[topic_name] = kafka_pub
                     else:

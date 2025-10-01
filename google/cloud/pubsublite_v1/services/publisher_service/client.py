@@ -71,12 +71,10 @@ from .transports.grpc_asyncio import PublisherServiceGrpcAsyncIOTransport
 
 # Optional Kafka imports
 try:
-    from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
     from .transports.kafka import PublisherServiceKafkaTransport
     HAS_KAFKA = True
 except ImportError:
     HAS_KAFKA = False
-    KafkaConfig = None  # type: ignore
 
 
 class PublisherServiceClientMeta(type):
@@ -536,7 +534,7 @@ class PublisherServiceClient(metaclass=PublisherServiceClientMeta):
         ] = None,
         client_options: Optional[Union[client_options_lib.ClientOptions, dict]] = None,
         client_info: gapic_v1.client_info.ClientInfo = DEFAULT_CLIENT_INFO,
-        kafka_config: Optional["KafkaConfig"] = None,
+        producer_config: Optional[Dict] = None,
     ) -> None:
         """Instantiates the publisher service client.
 
@@ -582,8 +580,8 @@ class PublisherServiceClient(metaclass=PublisherServiceClientMeta):
                 API requests. If ``None``, then default info will be used.
                 Generally, you only need to set this if you're developing
                 your own client library.
-            kafka_config (Optional[KafkaConfig]): Kafka configuration for
-                using Kafka transport. Required when transport="kafka".
+            producer_config (Optional[Dict]): Kafka producer configuration dict.
+                Required when transport="kafka".
 
         Raises:
             google.auth.exceptions.MutualTLSChannelError: If mutual TLS transport
@@ -685,9 +683,9 @@ class PublisherServiceClient(metaclass=PublisherServiceClientMeta):
                 "always_use_jwt_access": True,
                 "api_audience": self._client_options.api_audience,
             }
-            # Add kafka_config if provided (only used by Kafka transport)
-            if kafka_config is not None:
-                transport_kwargs["kafka_config"] = kafka_config
+            # Add producer_config if provided (only used by Kafka transport)
+            if producer_config is not None:
+                transport_kwargs["producer_config"] = producer_config
             self._transport = transport_init(**transport_kwargs)
 
         if "async" not in str(self._transport):

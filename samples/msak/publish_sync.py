@@ -61,7 +61,7 @@ def publish_messages_kafka(
     # Create client with Kafka transport
     client = pubsublite_v1.PublisherServiceClient(
         transport="kafka",
-        kafka_config=producer_config,
+        producer_config=producer_config,
     )
 
     # Construct topic path
