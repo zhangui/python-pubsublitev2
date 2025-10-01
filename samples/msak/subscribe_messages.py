@@ -168,6 +168,7 @@ def subscribe_with_kafka(
             fixed_partitions=parts,
             credentials=None,
             client_options=None,
+            metadata=None,
             use_kafka=True,
             kafka_config=oauth_config,
             consumer_group=consumer_group,
