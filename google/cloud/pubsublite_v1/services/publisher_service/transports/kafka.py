@@ -33,6 +33,14 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
     def __init__(
         self,
         *,
+        host: str = "pubsublite.googleapis.com",
+        credentials=None,
+        credentials_file=None,
+        scopes=None,
+        quota_project_id=None,
+        client_info=None,
+        always_use_jwt_access=True,
+        api_audience=None,
         producer_config: Dict[str, Any] = None,
         **kwargs
     ) -> None:
@@ -50,7 +58,17 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
         self._publishers = {}  # Cache: topic_name -> AsyncKafkaPublisher
 
         # Call base __init__ without producer_config
-        super().__init__(**kwargs)
+        super().__init__(
+            host=host,
+            credentials=credentials,
+            credentials_file=credentials_file,
+            scopes=scopes,
+            quota_project_id=quota_project_id,
+            client_info=client_info,
+            always_use_jwt_access=always_use_jwt_access,
+            api_audience=api_audience,
+            **kwargs
+        )
 
     @property
     def publish(
