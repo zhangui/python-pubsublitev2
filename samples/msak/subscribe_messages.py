@@ -30,7 +30,7 @@ from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from google.cloud.pubsublite.cloudpubsub import SubscriberClient
-from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfigBuilder
 from google.cloud.pubsublite.types import (
     FlowControlSettings,
     SubscriptionPath,
@@ -49,60 +49,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-
-def create_kafka_config(
-    bootstrap_servers: str,
-    use_oauth: bool = True,
-    use_mtls: bool = False
-) -> KafkaConfig:
-    """
-    Create Kafka configuration for the consumer using TokenProvider.
-
-    Args:
-        bootstrap_servers: Comma-separated list of Kafka bootstrap servers
-        use_oauth: Whether to use OAuth authentication
-        use_mtls: Whether to use mTLS authentication
-
-    Returns:
-        KafkaConfig object with appropriate settings
-    """
-    if use_mtls:
-        # mTLS configuration
-        config = {
-            'bootstrap.servers': bootstrap_servers,
-            'security.protocol': 'SSL',
-            'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
-            'ssl.keystore.password': 'keystorepass',
-            # Uncomment and set these if using separate cert files:
-            # 'ssl.certificate.location': '/path/to/client.crt',
-            # 'ssl.key.location': '/path/to/client.key',
-            # 'ssl.ca.location': '/path/to/ca.crt',
-        }
-    elif use_oauth:
-        if TokenProvider is None:
-            raise ImportError(
-                "TokenProvider is required for OAuth authentication. "
-                "Please ensure tokenprovider.py is in the same directory."
-            )
-
-        # Create token provider instance
-        token_provider = TokenProvider()
-
-        # OAuth configuration with TokenProvider
-        config = {
-            'bootstrap.servers': bootstrap_servers,
-            'security.protocol': 'SASL_SSL',
-            'sasl.mechanisms': 'OAUTHBEARER',
-            'oauth_cb': token_provider.get_token,
-        }
-    else:
-        # Simple plaintext configuration for local testing
-        config = {
-            'bootstrap.servers': bootstrap_servers,
-        }
-
-    return KafkaConfig(consumer_config=config)
 
 
 def message_callback(message):
@@ -166,12 +112,28 @@ def subscribe_with_kafka(
         bytes_outstanding=10 * 1024 * 1024,  # 10MB
     )
 
+    mtls_config = {
+            'bootstrap.servers': bootstrap_servers,
+            'security.protocol': 'SSL',
+            'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
+            'ssl.keystore.password': 'keystorepass',
+            # Uncomment and set these if using separate cert files:
+            # 'ssl.certificate.location': '/path/to/client.crt',
+            # 'ssl.key.location': '/path/to/client.key',
+            # 'ssl.ca.location': '/path/to/ca.crt',
+        }
+
+    token_provider = TokenProvider()
+
+    # OAuth configuration with TokenProvider
+    oauth_config = {
+        'bootstrap.servers': bootstrap_servers,
+        'security.protocol': 'SASL_SSL',
+        'sasl.mechanisms': 'OAUTHBEARER',
+        'oauth_cb': token_provider.get_token,
+    }
+
     # Create Kafka configuration with TokenProvider
-    kafka_config = create_kafka_config(
-        bootstrap_servers,
-        use_oauth=use_oauth,
-        use_mtls=use_mtls
-    )
 
     # If no consumer group specified, use a default
     if not consumer_group:
@@ -208,7 +170,7 @@ def subscribe_with_kafka(
             credentials=None,
             client_options=None,
             use_kafka=True,
-            kafka_config=kafka_config,
+            kafka_config=oauth_config,
             consumer_group=consumer_group,
         )
 
