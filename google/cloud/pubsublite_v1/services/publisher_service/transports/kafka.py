@@ -37,6 +37,7 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
         credentials=None,
         credentials_file=None,
         scopes=None,
+        client_cert_source_for_mtls=None,
         quota_project_id=None,
         client_info=None,
         always_use_jwt_access=True,
@@ -57,7 +58,7 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
         self._producer_config = producer_config
         self._publishers = {}  # Cache: topic_name -> AsyncKafkaPublisher
 
-        # Call base __init__ without producer_config
+        # Call base __init__ without producer_config (client_cert_source_for_mtls ignored for Kafka)
         super().__init__(
             host=host,
             credentials=credentials,
