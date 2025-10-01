@@ -90,7 +90,7 @@ def publish_messages_kafka(
     stream = client.publish(requests=request_generator())
 
     for i, response in enumerate(stream):
-        print(f"Published message {i}: offset=fff")
+        print(f"Published message {i}: offset={response.message_response}")
 
 
 if __name__ == "__main__":
