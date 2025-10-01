@@ -19,7 +19,7 @@ Subscribe to messages from a Managed Service for Apache Kafka (MSAK) topic.
 
 This sample demonstrates how to subscribe to and receive messages from
 Google Cloud's Managed Service for Apache Kafka using the Pub/Sub Lite
-client library's Kafka backend.
+client library's Kafka backend with TokenProvider for OAuth authentication.
 """
 
 import argparse
@@ -29,16 +29,19 @@ import sys
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
-from google.auth import default
 from google.cloud.pubsublite.cloudpubsub import SubscriberClient
-from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import (
-    KafkaConfig,
-    KafkaConfigBuilder,
-)
+from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
 from google.cloud.pubsublite.types import (
     FlowControlSettings,
     SubscriptionPath,
 )
+
+# Import TokenProvider from the same directory
+try:
+    from tokenprovider import TokenProvider
+except ImportError:
+    # If tokenprovider is not available, we'll create a fallback
+    TokenProvider = None
 
 # Configure logging
 logging.basicConfig(
@@ -48,26 +51,51 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_kafka_config(bootstrap_servers: str, use_oauth: bool = True) -> KafkaConfig:
+def create_kafka_config(
+    bootstrap_servers: str,
+    use_oauth: bool = True,
+    use_mtls: bool = False
+) -> KafkaConfig:
     """
-    Create Kafka configuration for the consumer.
+    Create Kafka configuration for the consumer using TokenProvider.
 
     Args:
         bootstrap_servers: Comma-separated list of Kafka bootstrap servers
-        use_oauth: Whether to use OAuth authentication (vs plaintext)
+        use_oauth: Whether to use OAuth authentication
+        use_mtls: Whether to use mTLS authentication
 
     Returns:
         KafkaConfig object with appropriate settings
     """
-    if use_oauth:
-        # Get Google Application Default Credentials
-        credentials, _ = default()
+    if use_mtls:
+        # mTLS configuration
+        config = {
+            'bootstrap.servers': bootstrap_servers,
+            'security.protocol': 'SSL',
+            'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
+            'ssl.keystore.password': 'keystorepass',
+            # Uncomment and set these if using separate cert files:
+            # 'ssl.certificate.location': '/path/to/client.crt',
+            # 'ssl.key.location': '/path/to/client.key',
+            # 'ssl.ca.location': '/path/to/ca.crt',
+        }
+    elif use_oauth:
+        if TokenProvider is None:
+            raise ImportError(
+                "TokenProvider is required for OAuth authentication. "
+                "Please ensure tokenprovider.py is in the same directory."
+            )
 
-        # Build OAuth configuration
-        config = KafkaConfigBuilder.build_oauth_config(
-            bootstrap_servers=bootstrap_servers,
-            credentials=credentials
-        )
+        # Create token provider instance
+        token_provider = TokenProvider()
+
+        # OAuth configuration with TokenProvider
+        config = {
+            'bootstrap.servers': bootstrap_servers,
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'OAUTHBEARER',
+            'oauth_cb': token_provider.get_token,
+        }
     else:
         # Simple plaintext configuration for local testing
         config = {
@@ -113,6 +141,8 @@ def subscribe_with_kafka(
     bootstrap_servers: str,
     consumer_group: Optional[str] = None,
     max_messages: int = 1000,
+    use_oauth: bool = True,
+    use_mtls: bool = False,
 ):
     """
     Subscribe to messages from a Kafka topic.
@@ -124,6 +154,8 @@ def subscribe_with_kafka(
         bootstrap_servers: Kafka bootstrap servers
         consumer_group: Consumer group ID (optional)
         max_messages: Maximum messages to buffer
+        use_oauth: Whether to use OAuth authentication
+        use_mtls: Whether to use mTLS authentication
     """
     # Create subscription path (we reuse this for topic name)
     subscription = SubscriptionPath(project_id, location, subscription_name)
@@ -134,8 +166,12 @@ def subscribe_with_kafka(
         bytes_outstanding=10 * 1024 * 1024,  # 10MB
     )
 
-    # Create Kafka configuration
-    kafka_config = create_kafka_config(bootstrap_servers)
+    # Create Kafka configuration with TokenProvider
+    kafka_config = create_kafka_config(
+        bootstrap_servers,
+        use_oauth=use_oauth,
+        use_mtls=use_mtls
+    )
 
     # If no consumer group specified, use a default
     if not consumer_group:
@@ -146,6 +182,8 @@ def subscribe_with_kafka(
     logger.info(f"  Bootstrap servers: {bootstrap_servers}")
     logger.info(f"  Consumer group: {consumer_group}")
     logger.info(f"  Max messages: {max_messages}")
+    auth_type = 'OAuth (TokenProvider)' if use_oauth else 'mTLS' if use_mtls else 'None'
+    logger.info(f"  Authentication: {auth_type}")
 
     # Create subscriber client with Kafka backend
     with ThreadPoolExecutor(max_workers=1) as executor:
@@ -251,6 +289,16 @@ def main():
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level"
     )
+    parser.add_argument(
+        "--no-oauth",
+        action="store_true",
+        help="Disable OAuth authentication (use plaintext)"
+    )
+    parser.add_argument(
+        "--use-mtls",
+        action="store_true",
+        help="Use mTLS authentication instead of OAuth"
+    )
 
     args = parser.parse_args()
 
@@ -265,6 +313,8 @@ def main():
         bootstrap_servers=args.bootstrap_servers,
         consumer_group=args.consumer_group,
         max_messages=args.max_messages,
+        use_oauth=not args.no_oauth and not args.use_mtls,
+        use_mtls=args.use_mtls,
     )
 
 
