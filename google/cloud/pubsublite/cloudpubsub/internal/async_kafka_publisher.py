@@ -134,19 +134,6 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 logger.debug(f"Message delivered to {msg.topic()}[{msg.partition()}]@{msg.offset()}")
         return on_delivery
 
-    async def _wait_for_delivery(self) -> str:
-        """Wait for message delivery by polling the producer."""
-        # Poll until delivery callback is triggered
-        while self._ack_id is None and self._delivery_error is None:
-            self._producer.poll(0.01)  # Poll for 10ms
-            # Yield control to allow other async tasks to run
-            await asyncio.sleep(0)
-
-        if self._delivery_error:
-            raise self._delivery_error
-
-        return self._ack_id
-
     async def publish(
         self, data: bytes, ordering_key: str = "", **attrs: Mapping[str, str]
     ) -> str:
@@ -187,8 +174,14 @@ class AsyncKafkaPublisher(AsyncSinglePublisher):
                 timestamp=0  # Use current timestamp
             )
 
-            # Wait for delivery confirmation
-            return await self._wait_for_delivery()
+            # Poll until delivery callback is triggered
+            while self._ack_id is None and self._delivery_error is None:
+                self._producer.poll(0.0)  # Poll for 10ms
+
+            if self._delivery_error:
+                raise self._delivery_error
+
+            return self._ack_id
 
         except BufferError as e:
             raise GoogleAPICallError(f"Kafka producer queue is full: {e}")

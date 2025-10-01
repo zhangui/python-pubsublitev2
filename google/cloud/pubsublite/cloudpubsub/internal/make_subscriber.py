@@ -78,6 +78,16 @@ from google.cloud.pubsublite_v1.services.subscriber_service.async_client import 
 from google.cloud.pubsublite_v1.services.partition_assignment_service.async_client import (
     PartitionAssignmentServiceAsyncClient,
 )
+from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+
+try:
+    from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_subscriber import (
+        AsyncKafkaSubscriber,
+    )
+    KAFKA_AVAILABLE = True
+except ImportError:
+    KAFKA_AVAILABLE = False
+
 from google.cloud.pubsublite_v1.services.cursor_service.async_client import (
     CursorServiceAsyncClient,
 )
@@ -189,6 +199,9 @@ def make_async_subscriber(
     credentials: Optional[Credentials] = None,
     client_options: Optional[ClientOptions] = None,
     metadata: Optional[Mapping[str, str]] = None,
+    use_kafka: bool = False,
+    kafka_config: Optional[KafkaConfig] = None,
+    consumer_group: Optional[str] = None,
 ) -> AsyncSingleSubscriber:
     """
     Make a Pub/Sub Lite AsyncSubscriber.
@@ -204,10 +217,34 @@ def make_async_subscriber(
       credentials: The credentials to use to connect. GOOGLE_DEFAULT_CREDENTIALS is used if None.
       client_options: Other options to pass to the client. Note that if you pass any you must set api_endpoint.
       metadata: Additional metadata to send with the RPC.
+      use_kafka: If True, use Kafka backend instead of Pub/Sub Lite.
+      kafka_config: Configuration for Kafka backend. Required if use_kafka is True.
+      consumer_group: Consumer group ID for Kafka. If not provided, uses subscription name.
 
     Returns:
       A new AsyncSubscriber.
     """
+    if use_kafka:
+        if not KAFKA_AVAILABLE:
+            raise ImportError(
+                "Kafka functionality requested but confluent-kafka is not installed. "
+                "Install with: pip install google-cloud-pubsublite[kafka]"
+            )
+
+        if kafka_config is None:
+            raise ValueError(
+                "kafka_config must be provided when use_kafka=True"
+            )
+
+        # Return Kafka subscriber implementation
+        return AsyncKafkaSubscriber(
+            kafka_config=kafka_config,
+            topic_name=subscription.name,
+            consumer_group=consumer_group or f"pubsublite-{subscription.name}",
+            flow_control_settings=per_partition_flow_control_settings,
+        )
+
+    # Original Pub/Sub Lite implementation follows...
     metadata = merge_metadata(pubsub_context(framework="CLOUD_PUBSUB_SHIM"), metadata)
     if client_options is None:
         client_options = ClientOptions(
