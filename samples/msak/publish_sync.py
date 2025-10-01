@@ -52,19 +52,17 @@ def publish_messages_kafka(
 
     # Create Kafka config with OAuth authentication
     token_provider = TokenProvider()
-    kafka_config = KafkaConfig(
-        producer_config={
-            'bootstrap.servers': bootstrap_servers,
-            'security.protocol': 'SASL_SSL',
-            'sasl.mechanisms': 'OAUTHBEARER',
-            'oauth_cb': token_provider.get_token,
-        }
-    )
+    producer_config={
+        'bootstrap.servers': bootstrap_servers,
+        'security.protocol': 'SASL_SSL',
+        'sasl.mechanisms': 'OAUTHBEARER',
+        'oauth_cb': token_provider.get_token,
+    }
 
     # Create client with Kafka transport
     client = pubsublite_v1.PublisherServiceClient(
         transport="kafka",
-        kafka_config=kafka_config,
+        kafka_config=producer_config,
     )
 
     # Construct topic path
