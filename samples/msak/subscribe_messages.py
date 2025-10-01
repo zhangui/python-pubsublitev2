@@ -216,21 +216,25 @@ def main():
     )
     parser.add_argument(
         "--project-id",
+        default="ygnahz-eg-codelab",
         required=True,
         help="Google Cloud project ID"
     )
     parser.add_argument(
         "--location",
+        default="us-central1",
         required=True,
         help="Cloud region (e.g., 'us-central1-a')"
     )
     parser.add_argument(
         "--subscription-name",
+        default="testtopic",
         required=True,
         help="Name of the subscription (maps to Kafka topic name)"
     )
     parser.add_argument(
         "--bootstrap-servers",
+        default="bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092",
         required=True,
         help="Kafka bootstrap servers (e.g., 'localhost:9092')"
     )
