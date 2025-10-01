@@ -30,7 +30,6 @@ from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from google.cloud.pubsublite.cloudpubsub import SubscriberClient
-from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfigBuilder
 from google.cloud.pubsublite.types import (
     FlowControlSettings,
     SubscriptionPath,
