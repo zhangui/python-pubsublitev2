@@ -24,6 +24,10 @@ for OAuth authentication.
 
 from google.cloud import pubsublite_v1
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
 try:
     from tokenprovider import TokenProvider
 except ImportError:
