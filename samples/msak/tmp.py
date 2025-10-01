@@ -17,3 +17,5 @@ print('SUCCESS: Client created')
   # 2. Clear all Python bytecode cache in the entire project (more thorough)
   find /Users/yangzhang/Desktop/psl/python-pubsublite -name "*.pyc" -delete
   find /Users/yangzhang/Desktop/psl/python-pubsublite -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
+
+find . -type f -name "*.pyc" -delete && find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
