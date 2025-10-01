@@ -78,9 +78,13 @@ def publish_messages_kafka(
         for i in range(num_messages):
             message = pubsublite_v1.PubSubMessage(
                 data=f"Message {i}".encode('utf-8'),
-                ordering_key=f"key-{i % 3}",
+                key=f"key-{i % 3}".encode('utf-8'),
             )
-            yield pubsublite_v1.PublishRequest(messages=[message])
+            yield pubsublite_v1.PublishRequest(
+                message_publish_request=pubsublite_v1.MessagePublishRequest(
+                    messages=[message]
+                )
+            )
 
     # Publish and process responses
     stream = client.publish(requests=request_generator())
