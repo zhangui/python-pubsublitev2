@@ -44,7 +44,7 @@ mtls_config={
         'enable.partition.eof': True,  # surface EOF events per partition
     }
 
-consumer = Consumer(mtls_config)
+consumer = Consumer(config)
 
 def fmt_ts(ts_ms: int | None) -> str:
     if not ts_ms:
