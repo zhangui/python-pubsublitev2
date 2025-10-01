@@ -74,15 +74,13 @@ def publish_single_message(
             'bootstrap.servers': bootstrap_servers,
             'security.protocol': 'SSL',
             'ssl.keystore.location': '/home/ygnahz/client-keystore.jks',
-            # 'ssl.certificate.location': '/path/to/client.crt',
-            # 'ssl.ca.location': '/path/to/ca.crt',
             'ssl.keystore.password': 'keystorepass'
     }
     
     # Configure and create Publisher Client with Kafka backend
     client = PublisherClient(
         use_kafka=True,
-        kafka_producer_config=producer_mtls_config
+        kafka_producer_config=producer_oath_config
     )
     
     print(f"Using backend: kafka")
