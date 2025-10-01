@@ -23,7 +23,6 @@ for OAuth authentication.
 """
 
 from google.cloud import pubsublite_v1
-from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
 
 try:
     from tokenprovider import TokenProvider
