@@ -60,7 +60,7 @@ def publish_messages_kafka(
 
     # Create client with Kafka transport
     client = pubsublite_v1.PublisherServiceClient(
-        credentials=token_provider.get_credentials(),
+        # credentials=token_provider.get_credentials(),
         transport="kafka",
         producer_config=producer_config,
     )
