@@ -17,7 +17,7 @@
 
 import asyncio
 from typing import Callable, Iterator, Dict, Any
-from google.cloud.pubsublite_v1.types import publisher
+from google.cloud.pubsublite_v1.types import publisher, common
 from google.longrunning import operations_pb2
 from .base import PublisherServiceTransport
 
@@ -135,9 +135,11 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
                             # Extract offset from ack_id (format: "topic:partition:offset")
                             offset = int(ack_id.split(':')[-1])
 
-                            # Yield PublishResponse
+                            # Yield PublishResponse with message_response containing the cursor
                             yield publisher.PublishResponse(
-                                start_cursor=publisher.Cursor(offset=offset)
+                                message_response=publisher.MessagePublishResponse(
+                                    start_cursor=common.Cursor(offset=offset)
+                                )
                             )
 
             self._stubs["publish"] = _publish_stream
