@@ -57,6 +57,7 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
         # Store producer_config before calling super (base doesn't accept it)
         self._producer_config = producer_config
         self._publishers = {}  # Cache: topic_name -> AsyncKafkaPublisher
+        self._stubs = {}  # Cache: method_name -> callable (like grpc transport)
 
         # Call base __init__ without producer_config (client_cert_source_for_mtls ignored for Kafka)
         super().__init__(
@@ -70,6 +71,9 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
             api_audience=api_audience,
             **kwargs
         )
+
+        # Initialize wrapped methods (required by client)
+        self._prep_wrapped_messages(client_info)
 
     @property
     def publish(
@@ -86,53 +90,59 @@ class PublisherServiceKafkaTransport(PublisherServiceTransport):
         Returns:
             Callable that accepts request iterator and yields responses.
         """
-        def _publish_stream(
-            request_iterator: Iterator[publisher.PublishRequest],
-        ) -> Iterator[publisher.PublishResponse]:
-            """Handle publish request stream."""
-            topic_name = None
-            kafka_pub = None
+        # Cache the publish callable (required for _wrapped_methods to work)
+        if "publish" not in self._stubs:
+            def _publish_stream(
+                request_iterator: Iterator[publisher.PublishRequest],
+                **kwargs  # Accept and ignore gRPC-specific kwargs (metadata, timeout, etc.)
+            ) -> Iterator[publisher.PublishResponse]:
+                """Handle publish request stream."""
+                topic_name = None
+                kafka_pub = None
 
-            for request in request_iterator:
-                # Handle initial request with topic
-                if request.HasField('initial_request'):
-                    # Extract topic name from path: projects/*/locations/*/topics/{name}
-                    topic_path = request.initial_request.topic
-                    topic_name = topic_path.split('/')[-1]
+                for request in request_iterator:
+                    # Handle initial request with topic
+                    if request.initial_request and request.initial_request.topic:
+                        # Extract topic name from path: projects/*/locations/*/topics/{name}
+                        topic_path = request.initial_request.topic
+                        topic_name = topic_path.split('/')[-1]
 
-                    # Get or create publisher for this topic
-                    if topic_name not in self._publishers:
-                        from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
-                        from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher import AsyncKafkaPublisher
+                        # Get or create publisher for this topic
+                        if topic_name not in self._publishers:
+                            from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+                            from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_publisher import AsyncKafkaPublisher
 
-                        kafka_config = KafkaConfig(producer_config=self._producer_config)
-                        kafka_pub = AsyncKafkaPublisher(kafka_config, topic_name)
-                        asyncio.run(kafka_pub.__aenter__())
-                        self._publishers[topic_name] = kafka_pub
-                    else:
-                        kafka_pub = self._publishers[topic_name]
+                            kafka_config = KafkaConfig(producer_config=self._producer_config)
+                            kafka_pub = AsyncKafkaPublisher(kafka_config, topic_name)
+                            asyncio.run(kafka_pub.__aenter__())
+                            self._publishers[topic_name] = kafka_pub
+                        else:
+                            kafka_pub = self._publishers[topic_name]
 
-                    # No response for initial request
-                    continue
+                        # No response for initial request
+                        continue
 
-                # Handle message requests
-                for message in request.messages:
-                    # Publish to Kafka using AsyncKafkaPublisher
-                    ack_id = asyncio.run(kafka_pub.publish(
-                        data=message.data,
-                        ordering_key=message.ordering_key,
-                        **dict(message.attributes)
-                    ))
+                    # Handle message requests
+                    if request.message_publish_request and request.message_publish_request.messages:
+                        for message in request.message_publish_request.messages:
+                            # Publish to Kafka using AsyncKafkaPublisher
+                            ack_id = asyncio.run(kafka_pub.publish(
+                                data=message.data,
+                                ordering_key=message.key.decode('utf-8') if message.key else "",
+                                **dict(message.attributes)
+                            ))
 
-                    # Extract offset from ack_id (format: "topic:partition:offset")
-                    offset = int(ack_id.split(':')[-1])
+                            # Extract offset from ack_id (format: "topic:partition:offset")
+                            offset = int(ack_id.split(':')[-1])
 
-                    # Yield PublishResponse
-                    yield publisher.PublishResponse(
-                        start_cursor=publisher.Cursor(offset=offset)
-                    )
+                            # Yield PublishResponse
+                            yield publisher.PublishResponse(
+                                start_cursor=publisher.Cursor(offset=offset)
+                            )
 
-        return _publish_stream
+            self._stubs["publish"] = _publish_stream
+
+        return self._stubs["publish"]
 
     def close(self):
         """Close all Kafka publishers and release resources."""
