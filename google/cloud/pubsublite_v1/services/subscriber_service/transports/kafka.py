@@ -131,8 +131,6 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
 
         try:
             for request in request_iterator:
-                logger.debug(f"Processing request: {request}")
-
                 # Handle initial request
                 if request.initial:
                     subscription_name = request.initial.subscription
@@ -143,7 +141,6 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                     topic_name = subscription_name.split('/')[-1]
 
                     logger.info(f"Initial request - subscription: {subscription_name}, partition: {partition}, topic: {topic_name}")
-                    logger.debug(f"Consumer config: {self._consumer_config}")
 
                     # Create cache key for this subscription:partition pair
                     cache_key = f"{subscription_name}:{partition}"
@@ -155,15 +152,11 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                         )
                         from google.cloud.pubsublite.types import FlowControlSettings
 
-                        # Create consumer group ID
-                        consumer_group = f"pubsublite-{topic_name}-p{partition}"
-                        logger.info(f"Creating new AsyncKafkaSubscriber for topic: {topic_name}, consumer_group: {consumer_group}")
-
                         # Create subscriber with consumer config
                         kafka_sub = AsyncKafkaSubscriber(
                             kafka_config=self._consumer_config,
                             topic_name=topic_name,
-                            consumer_group=consumer_group,
+                            consumer_group=f"pubsublite-{topic_name}-p{partition}",
                             flow_control_settings=FlowControlSettings(
                                 messages_outstanding=1000,
                                 bytes_outstanding=10 * 1024 * 1024,  # 10MB
@@ -171,17 +164,13 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                         )
 
                         # Start the consumer
-                        logger.info(f"Starting AsyncKafkaSubscriber...")
                         loop.run_until_complete(kafka_sub.__aenter__())
-                        logger.info(f"AsyncKafkaSubscriber started successfully")
                         self._subscribers[cache_key] = kafka_sub
                     else:
                         kafka_sub = self._subscribers[cache_key]
-                        logger.info(f"Reusing existing AsyncKafkaSubscriber for {cache_key}")
 
                     # Send initial response with cursor
                     # For Kafka, we'll use the current position as the cursor
-                    logger.debug(f"Sending initial response with cursor")
                     yield subscriber.SubscribeResponse(
                         initial=subscriber.InitialSubscribeResponse(
                             cursor=common.Cursor(offset=0)  # Will be updated on first read
@@ -192,52 +181,35 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                 elif request.flow_control:
                     flow_tokens_messages += request.flow_control.allowed_messages
                     flow_tokens_bytes += request.flow_control.allowed_bytes
-                    logger.info(f"Flow control granted: {request.flow_control.allowed_messages} messages, "
+                    logger.debug(f"Flow control granted: {request.flow_control.allowed_messages} messages, "
                                 f"{request.flow_control.allowed_bytes} bytes")
-                    logger.debug(f"Total flow tokens: {flow_tokens_messages} messages, {flow_tokens_bytes} bytes")
 
                     # If we have tokens and a subscriber, try to read messages
                     if kafka_sub and flow_tokens_messages > 0:
                         # Read messages from Kafka
-                        logger.info(f"Attempting to read messages from Kafka (tokens available: {flow_tokens_messages})...")
-                        try:
-                            messages = loop.run_until_complete(kafka_sub.read())
-                            logger.info(f"Read {len(messages) if messages else 0} messages from Kafka")
-
-                            if messages:
-                                logger.debug(f"First message data: {messages[0].data[:100] if messages[0].data else 'empty'}")
-                        except Exception as e:
-                            logger.error(f"Error reading from Kafka: {e}", exc_info=True)
-                            continue
+                        messages = loop.run_until_complete(kafka_sub.read())
+                        logger.info(f"Read {len(messages) if messages else 0} messages from Kafka")
 
                         if messages:
                             # Convert messages to SequencedMessage format
                             sequenced_messages = []
                             total_bytes = 0
 
-                            for idx, msg in enumerate(messages[:flow_tokens_messages]):
-                                logger.debug(f"Converting message {idx}: data={msg.data[:50] if msg.data else 'empty'}")
+                            for msg in messages[:flow_tokens_messages]:
                                 # Convert to SequencedMessage
                                 seq_msg = self._kafka_message_to_sequenced(msg)
                                 if seq_msg:
                                     sequenced_messages.append(seq_msg)
                                     total_bytes += seq_msg.size_bytes
-                                    logger.debug(f"Converted message {idx} successfully, size={seq_msg.size_bytes}")
 
                                     # Check byte limit
                                     if total_bytes >= flow_tokens_bytes:
-                                        logger.debug(f"Reached byte limit: {total_bytes} >= {flow_tokens_bytes}")
                                         break
-                                else:
-                                    logger.warning(f"Failed to convert message {idx}")
 
                             if sequenced_messages:
                                 # Update flow tokens
                                 flow_tokens_messages -= len(sequenced_messages)
                                 flow_tokens_bytes -= total_bytes
-
-                                logger.info(f"Yielding {len(sequenced_messages)} messages to client")
-                                logger.debug(f"Remaining flow tokens: {flow_tokens_messages} messages, {flow_tokens_bytes} bytes")
 
                                 # Yield message response
                                 yield subscriber.SubscribeResponse(
@@ -245,10 +217,6 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                                         messages=sequenced_messages
                                     )
                                 )
-                            else:
-                                logger.warning("No messages were successfully converted")
-                        else:
-                            logger.debug("No messages available from Kafka at this time")
 
                 # Handle seek requests (not implemented for Kafka yet)
                 elif request.seek:
@@ -274,23 +242,17 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
             SequencedMessage proto or None if conversion fails
         """
         try:
-            logger.debug(f"Converting message: type={type(message)}, data_size={len(message.data) if message.data else 0}")
-
             # Extract Kafka offset from ack_id if available
             # Format: AckId(generation=0, offset=X) encoded as "0,X"
             offset = 0
             if hasattr(message, 'ack_id'):
-                logger.debug(f"Message has ack_id: {message.ack_id}")
                 if isinstance(message.ack_id, str) and ',' in message.ack_id:
                     _, offset_str = message.ack_id.split(',')
                     offset = int(offset_str)
                 else:
                     # ack_id might be an AckId namedtuple
-                    logger.debug(f"ack_id type: {type(message.ack_id)}")
                     if hasattr(message.ack_id, 'offset'):
                         offset = message.ack_id.offset
-
-            logger.debug(f"Message offset: {offset}")
 
             # Create PubSubMessage
             pubsub_message = common.PubSubMessage(
@@ -302,7 +264,6 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
             # PubSubMessage expects attributes as map<string, AttributeValues>
             # where AttributeValues contains a list of bytes
             if message.attributes:
-                logger.debug(f"Converting {len(message.attributes)} attributes")
                 for key, value in message.attributes.items():
                     # Create AttributeValues message with single value
                     attr_values = common.AttributeValues()
@@ -315,21 +276,16 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                 len(k) + len(v) for k, v in (message.attributes or {}).items()
             )
 
-            logger.debug(f"Creating SequencedMessage with size={size_bytes}")
-
             # Create SequencedMessage
-            seq_msg = common.SequencedMessage(
+            return common.SequencedMessage(
                 cursor=common.Cursor(offset=offset),
                 publish_time=message.publish_time,
                 message=pubsub_message,
                 size_bytes=size_bytes,
             )
 
-            logger.debug(f"Successfully created SequencedMessage")
-            return seq_msg
-
         except Exception as e:
-            logger.error(f"Error converting Kafka message to SequencedMessage: {e}", exc_info=True)
+            logger.error(f"Error converting Kafka message to SequencedMessage: {e}")
             return None
 
     def close(self):

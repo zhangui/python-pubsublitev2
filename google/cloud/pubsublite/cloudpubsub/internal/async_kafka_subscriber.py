@@ -92,10 +92,8 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
 
         # Set auto.offset.reset if not already set
         # Use 'earliest' to read from the beginning if no committed offset exists
-        # This ensures we don't miss messages that were published before the consumer started
         if 'auto.offset.reset' not in config:
             config['auto.offset.reset'] = 'earliest'
-            logger.info(f"Setting auto.offset.reset to 'earliest' to read from beginning")
 
         return config
 
@@ -183,41 +181,14 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
         max_messages = self._flow_control.messages_outstanding
         max_bytes = self._flow_control.bytes_outstanding
 
-        logger.debug(f"Starting read: max_messages={max_messages}, max_bytes={max_bytes}")
-
         # Poll for messages with timeout
-        poll_attempts = 0
-        max_poll_attempts = 10  # Try polling up to 10 times
-
-        while len(messages) < max_messages and bytes_read < max_bytes and poll_attempts < max_poll_attempts:
-            poll_attempts += 1
+        while len(messages) < max_messages and bytes_read < max_bytes:
             # Poll for a single message with short timeout
-            logger.debug(f"Poll attempt {poll_attempts}: Polling Kafka consumer (topic={self._topic_name}, group={self._consumer_group})")
-
-            # Log current position information on first poll
-            if poll_attempts == 1:
-                try:
-                    # Get current assignment after subscribing
-                    assignment = self._consumer.assignment()
-                    if assignment:
-                        logger.info(f"Consumer assignment: {[(tp.topic, tp.partition, tp.offset) for tp in assignment]}")
-                        # Get committed offsets
-                        for tp in assignment:
-                            committed = self._consumer.committed([tp])
-                            if committed:
-                                logger.info(f"Committed offset for {tp.topic}:{tp.partition} = {committed[0].offset if committed[0] else 'None'}")
-                    else:
-                        logger.info("Consumer has no partition assignment yet")
-                except Exception as e:
-                    logger.debug(f"Could not get assignment info: {e}")
-
             kafka_msg = self._consumer.poll(timeout=0.1)
 
             if kafka_msg is None:
-                logger.debug(f"Poll returned None (no messages available)")
                 # No more messages available right now
                 if messages:
-                    logger.debug(f"Returning {len(messages)} messages collected so far")
                     break  # Return what we have
                 # If no messages yet, keep trying with async sleep
                 await asyncio.sleep(0.01)
@@ -226,54 +197,38 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
             if kafka_msg.error():
                 if kafka_msg.error().code() == KafkaError._PARTITION_EOF:
                     # End of partition, normal condition
-                    logger.debug(f"Reached end of partition")
                     break
                 else:
-                    logger.error(f"Kafka error: {kafka_msg.error()}")
                     raise GoogleAPICallError(f"Kafka error: {kafka_msg.error()}")
 
             # Convert and add message
             try:
-                logger.info(f"Received Kafka message: topic={kafka_msg.topic()}, partition={kafka_msg.partition()}, "
-                           f"offset={kafka_msg.offset()}, value_size={len(kafka_msg.value() or b'')}")
-                logger.debug(f"Message value: {kafka_msg.value()[:100] if kafka_msg.value() else 'empty'}")
-
                 pubsub_msg = self._kafka_to_pubsub_message(kafka_msg)
                 messages.append(pubsub_msg)
                 bytes_read += len(kafka_msg.value() or b'')
-                logger.debug(f"Successfully converted message, total messages={len(messages)}, bytes_read={bytes_read}")
             except Exception as e:
-                logger.error(f"Error converting Kafka message: {e}", exc_info=True)
+                logger.error(f"Error converting Kafka message: {e}")
                 continue
 
-        logger.info(f"Read completed: returned {len(messages)} messages, bytes_read={bytes_read}, poll_attempts={poll_attempts}")
         return messages
 
     async def __aenter__(self):
         """Start the Kafka consumer."""
         if self._started:
-            logger.debug(f"Consumer already started, returning existing instance")
             return self
 
         try:
             # Create consumer with configuration
             config = self._create_consumer_config()
-            logger.info(f"Creating Kafka consumer with config: {config}")
             self._consumer = Consumer(config)
 
             # Subscribe to topic
-            logger.info(f"Subscribing to topic: {self._topic_name}")
             self._consumer.subscribe([self._topic_name])
 
-            # Note: subscription() and assignment() methods may not be available immediately
-            # after subscribe(). They're populated after the consumer fetches metadata.
-            logger.info(f"Consumer subscribed to topic: {self._topic_name}")
-
             self._started = True
-            logger.info(f"Kafka consumer started successfully for topic: {self._topic_name}, group: {self._consumer_group}")
+            logger.info(f"Kafka consumer started for topic: {self._topic_name}, group: {self._consumer_group}")
             return self
         except Exception as e:
-            logger.error(f"Failed to start Kafka consumer: {e}", exc_info=True)
             raise GoogleAPICallError(f"Failed to start Kafka consumer: {e}")
 
     async def __aexit__(self, exc_type, exc_value, traceback):
