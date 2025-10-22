@@ -83,15 +83,6 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
         """Create the confluent-kafka Consumer configuration."""
         config = self._kafka_config.copy()
 
-        # Override with consumer-specific settings
-        # config.update({
-        #     'group.id': self._consumer_group,
-        #     'enable.auto.commit': False,  # Manual commit on ack()
-        #     'auto.offset.reset': 'earliest',
-        #     'session.timeout.ms': 30000,
-        #     'max.poll.records': str(self._flow_control.messages_outstanding),
-        # })
-
         return config
 
     def _kafka_to_pubsub_message(self, kafka_msg) -> Message:
