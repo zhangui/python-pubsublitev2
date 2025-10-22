@@ -249,9 +249,19 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
             # Create PubSubMessage
             pubsub_message = common.PubSubMessage(
                 data=message.data,
-                attributes=dict(message.attributes) if message.attributes else {},
                 key=message.ordering_key.encode('utf-8') if message.ordering_key else b"",
             )
+
+            # Set attributes - need to convert to AttributeValues format
+            # PubSubMessage expects attributes as map<string, AttributeValues>
+            # where AttributeValues contains a list of bytes
+            if message.attributes:
+                for key, value in message.attributes.items():
+                    # Create AttributeValues message with single value
+                    attr_values = common.AttributeValues()
+                    # Convert string value to bytes and add to values list
+                    attr_values.values.append(value.encode('utf-8') if isinstance(value, str) else value)
+                    pubsub_message.attributes[key] = attr_values
 
             # Calculate size
             size_bytes = len(message.data) + sum(
