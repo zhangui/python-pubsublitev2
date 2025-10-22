@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from concurrent.futures.thread import ThreadPoolExecutor
-from typing import Optional, Union, Set, AsyncIterator
+from typing import Optional, Union, Set, AsyncIterator, Dict, Any
 
 from google.api_core.client_options import ClientOptions
 from google.auth.credentials import Credentials
@@ -24,6 +24,14 @@ from google.cloud.pubsublite.cloudpubsub.reassignment_handler import Reassignmen
 from google.cloud.pubsublite.cloudpubsub.internal.make_subscriber import (
     make_async_subscriber,
 )
+
+# Optional Kafka imports
+try:
+    from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
+    KAFKA_AVAILABLE = True
+except ImportError:
+    KafkaConfig = None
+    KAFKA_AVAILABLE = False
 from google.cloud.pubsublite.cloudpubsub.internal.multiplexed_async_subscriber_client import (
     MultiplexedAsyncSubscriberClient,
 )
@@ -49,6 +57,41 @@ from google.cloud.pubsublite.types import (
 from overrides import overrides
 
 
+def _create_kafka_consumer_config(
+    consumer_config: Optional[Dict[str, Any]] = None,
+    consumer_group: Optional[str] = None,
+) -> KafkaConfig:
+    """
+    Create a KafkaConfig for consumer with the provided parameters.
+
+    Args:
+        consumer_config: Complete Kafka consumer configuration
+        consumer_group: Consumer group ID
+
+    Returns:
+        KafkaConfig instance
+    """
+    if not KAFKA_AVAILABLE:
+        raise ImportError(
+            "Kafka functionality requested but confluent-kafka is not installed. "
+            "Install with: pip install google-cloud-pubsublite[kafka]"
+        )
+
+    if not consumer_config:
+        raise ValueError(
+            "kafka_consumer_config is required when using Kafka backend. "
+            "Please provide a complete Kafka consumer configuration including "
+            "'bootstrap.servers' and authentication settings."
+        )
+
+    if 'bootstrap.servers' not in consumer_config:
+        raise ValueError(
+            "kafka_consumer_config must contain 'bootstrap.servers'"
+        )
+
+    return KafkaConfig(consumer_config=consumer_config)
+
+
 class SubscriberClient(SubscriberClientInterface, ConstructableFromServiceAccount):
     """
     A SubscriberClient reads messages similar to Google Pub/Sub.
@@ -70,6 +113,10 @@ class SubscriberClient(SubscriberClientInterface, ConstructableFromServiceAccoun
         credentials: Optional[Credentials] = None,
         transport: str = "grpc_asyncio",
         client_options: Optional[ClientOptions] = None,
+        # Kafka-specific parameters
+        use_kafka: bool = False,
+        kafka_consumer_config: Optional[Dict[str, Any]] = None,
+        consumer_group: Optional[str] = None,
     ):
         """
         Create a new SubscriberClient.
@@ -81,9 +128,21 @@ class SubscriberClient(SubscriberClientInterface, ConstructableFromServiceAccoun
             credentials: If provided, the credentials to use when connecting.
             transport: The transport to use. Must correspond to an asyncio transport.
             client_options: The client options to use when connecting. If used, must explicitly set `api_endpoint`.
+            use_kafka: If True, use Kafka backend instead of Pub/Sub Lite.
+            kafka_consumer_config: Kafka consumer configuration options. Must contain 'bootstrap.servers' when using Kafka backend.
+            consumer_group: Consumer group ID for Kafka. If not provided, uses subscription name.
         """
         if executor is None:
             executor = ThreadPoolExecutor()
+
+        # Create Kafka config if using Kafka backend
+        kafka_config = None
+        if use_kafka:
+            kafka_config = _create_kafka_consumer_config(
+                consumer_config=kafka_consumer_config,
+                consumer_group=consumer_group,
+            )
+
         self._impl = MultiplexedSubscriberClient(
             executor,
             lambda subscription, partitions, settings: make_async_subscriber(
@@ -96,6 +155,9 @@ class SubscriberClient(SubscriberClientInterface, ConstructableFromServiceAccoun
                 fixed_partitions=partitions,
                 credentials=credentials,
                 client_options=client_options,
+                use_kafka=use_kafka,
+                kafka_config=kafka_config,
+                consumer_group=consumer_group,
             ),
         )
         self._require_started = RequireStarted()
@@ -151,6 +213,10 @@ class AsyncSubscriberClient(
         credentials: Optional[Credentials] = None,
         transport: str = "grpc_asyncio",
         client_options: Optional[ClientOptions] = None,
+        # Kafka-specific parameters
+        use_kafka: bool = False,
+        kafka_consumer_config: Optional[Dict[str, Any]] = None,
+        consumer_group: Optional[str] = None,
     ):
         """
         Create a new AsyncSubscriberClient.
@@ -161,7 +227,18 @@ class AsyncSubscriberClient(
             credentials: If provided, the credentials to use when connecting.
             transport: The transport to use. Must correspond to an asyncio transport.
             client_options: The client options to use when connecting. If used, must explicitly set `api_endpoint`.
+            use_kafka: If True, use Kafka backend instead of Pub/Sub Lite.
+            kafka_consumer_config: Kafka consumer configuration options. Must contain 'bootstrap.servers' when using Kafka backend.
+            consumer_group: Consumer group ID for Kafka. If not provided, uses subscription name.
         """
+        # Create Kafka config if using Kafka backend
+        kafka_config = None
+        if use_kafka:
+            kafka_config = _create_kafka_consumer_config(
+                consumer_config=kafka_consumer_config,
+                consumer_group=consumer_group,
+            )
+
         self._impl = MultiplexedAsyncSubscriberClient(
             lambda subscription, partitions, settings: make_async_subscriber(
                 subscription=subscription,
@@ -173,6 +250,9 @@ class AsyncSubscriberClient(
                 fixed_partitions=partitions,
                 credentials=credentials,
                 client_options=client_options,
+                use_kafka=use_kafka,
+                kafka_config=kafka_config,
+                consumer_group=consumer_group,
             )
         )
         self._require_started = RequireStarted()

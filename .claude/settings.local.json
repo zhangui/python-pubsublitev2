@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python:*)",
       "Bash(nox -s unit:*)",
-      "Bash(nox:*)"
+      "Bash(nox:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []
