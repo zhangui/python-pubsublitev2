@@ -22,12 +22,19 @@ using the Pub/Sub Lite v1 SubscriberServiceClient with Kafka transport and Token
 for OAuth authentication.
 """
 
+import logging
 import threading
 import time
 import signal
 import sys
 from typing import Optional
 from google.cloud import pubsublite_v1
+
+# Enable debug logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 try:
     from tokenprovider import TokenProvider

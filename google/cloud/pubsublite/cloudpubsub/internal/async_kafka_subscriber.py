@@ -83,6 +83,17 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
         """Create the confluent-kafka Consumer configuration."""
         config = self._kafka_config.copy()
 
+        # Override with consumer-specific settings
+        # IMPORTANT: Override group.id with the one we want to use
+        config.update({
+            'group.id': self._consumer_group,
+            'enable.auto.commit': False,  # Manual commit on ack()
+        })
+
+        # Set auto.offset.reset if not already set
+        if 'auto.offset.reset' not in config:
+            config['auto.offset.reset'] = 'latest'
+
         return config
 
     def _kafka_to_pubsub_message(self, kafka_msg) -> Message:
@@ -208,6 +219,7 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
         try:
             # Create consumer with configuration
             config = self._create_consumer_config()
+            logger.info(f"Creating Kafka consumer with config: {config}")
             self._consumer = Consumer(config)
 
             # Subscribe to topic
