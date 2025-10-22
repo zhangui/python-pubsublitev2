@@ -69,6 +69,13 @@ from .transports.base import SubscriberServiceTransport, DEFAULT_CLIENT_INFO
 from .transports.grpc import SubscriberServiceGrpcTransport
 from .transports.grpc_asyncio import SubscriberServiceGrpcAsyncIOTransport
 
+# Optional Kafka imports
+try:
+    from .transports.kafka import SubscriberServiceKafkaTransport
+    HAS_KAFKA = True
+except ImportError:
+    HAS_KAFKA = False
+
 
 class SubscriberServiceClientMeta(type):
     """Metaclass for the SubscriberService client.
@@ -83,6 +90,8 @@ class SubscriberServiceClientMeta(type):
     )  # type: Dict[str, Type[SubscriberServiceTransport]]
     _transport_registry["grpc"] = SubscriberServiceGrpcTransport
     _transport_registry["grpc_asyncio"] = SubscriberServiceGrpcAsyncIOTransport
+    if HAS_KAFKA:
+        _transport_registry["kafka"] = SubscriberServiceKafkaTransport
 
     def get_transport_class(
         cls,
@@ -524,6 +533,7 @@ class SubscriberServiceClient(metaclass=SubscriberServiceClientMeta):
         ] = None,
         client_options: Optional[Union[client_options_lib.ClientOptions, dict]] = None,
         client_info: gapic_v1.client_info.ClientInfo = DEFAULT_CLIENT_INFO,
+        consumer_config: Optional[Dict] = None,
     ) -> None:
         """Instantiates the subscriber service client.
 
@@ -569,6 +579,8 @@ class SubscriberServiceClient(metaclass=SubscriberServiceClientMeta):
                 API requests. If ``None``, then default info will be used.
                 Generally, you only need to set this if you're developing
                 your own client library.
+            consumer_config (Optional[Dict]): Kafka consumer configuration dict.
+                Required when transport="kafka".
 
         Raises:
             google.auth.exceptions.MutualTLSChannelError: If mutual TLS transport
@@ -659,17 +671,21 @@ class SubscriberServiceClient(metaclass=SubscriberServiceClientMeta):
                 else cast(Callable[..., SubscriberServiceTransport], transport)
             )
             # initialize with the provided callable or the passed in class
-            self._transport = transport_init(
-                credentials=credentials,
-                credentials_file=self._client_options.credentials_file,
-                host=self._api_endpoint,
-                scopes=self._client_options.scopes,
-                client_cert_source_for_mtls=self._client_cert_source,
-                quota_project_id=self._client_options.quota_project_id,
-                client_info=client_info,
-                always_use_jwt_access=True,
-                api_audience=self._client_options.api_audience,
-            )
+            transport_kwargs = {
+                "credentials": credentials,
+                "credentials_file": self._client_options.credentials_file,
+                "host": self._api_endpoint,
+                "scopes": self._client_options.scopes,
+                "client_cert_source_for_mtls": self._client_cert_source,
+                "quota_project_id": self._client_options.quota_project_id,
+                "client_info": client_info,
+                "always_use_jwt_access": True,
+                "api_audience": self._client_options.api_audience,
+            }
+            # Add consumer_config if provided (only used by Kafka transport)
+            if consumer_config is not None:
+                transport_kwargs["consumer_config"] = consumer_config
+            self._transport = transport_init(**transport_kwargs)
 
         if "async" not in str(self._transport):
             if CLIENT_LOGGING_SUPPORTED and _LOGGER.isEnabledFor(
