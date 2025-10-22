@@ -24,7 +24,10 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from google.cloud.pubsublite.cloudpubsub.internal.single_subscriber import (
     AsyncSingleSubscriber,
 )
-from google.cloud.pubsublite.cloudpubsub.internal.wrapped_message import WrappedMessage
+from google.cloud.pubsublite.cloudpubsub.internal.wrapped_message import (
+    WrappedMessage,
+    AckId,
+)
 from google.cloud.pubsublite.types import FlowControlSettings
 
 try:
@@ -74,7 +77,7 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
         )
         self._consumer: Optional[Consumer] = None
         self._started = False
-        self._pending_acks: Dict[str, Dict[str, Any]] = {}  # ack_id -> dict with topic, partition, offset
+        self._pending_acks: Dict[AckId, Dict[str, Any]] = {}  # ack_id -> dict with topic, partition, offset
 
     def _create_consumer_config(self) -> Dict[str, Any]:
         """Create the confluent-kafka Consumer configuration."""
@@ -117,8 +120,8 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
             ordering_key=kafka_msg.key().decode('utf-8') if kafka_msg.key() else "",
         )
 
-        # Create ack_id
-        ack_id = f"{kafka_msg.topic()}:{kafka_msg.partition()}:{kafka_msg.offset()}"
+        # Create ack_id using AckId namedtuple (generation=0 for Kafka since we don't have resets)
+        ack_id = AckId(generation=0, offset=kafka_msg.offset())
 
         # Store for later ack/nack
         self._pending_acks[ack_id] = {
@@ -127,34 +130,36 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
             'offset': kafka_msg.offset(),
         }
 
-        # Create wrapped message with ack/nack callbacks
+        # Create wrapped message with single ack handler
+        # ack_handler takes (AckId, bool) where bool is True for ack, False for nack
         wrapped = WrappedMessage(
             pb=pubsub_msg._pb,
             ack_id=ack_id,
-            ack_callback=lambda: self._ack_message(ack_id),
-            nack_callback=lambda: self._nack_message(ack_id),
+            ack_handler=lambda id, ack: self._handle_ack(id, ack),
         )
 
-        return Message(wrapped._pb, ack_id, 0, None)
+        return Message(wrapped._pb, ack_id.encode(), 0, None)
 
-    def _ack_message(self, ack_id: str):
-        """Acknowledge a message by committing its offset."""
+    def _handle_ack(self, ack_id: AckId, should_ack: bool):
+        """Handle message acknowledgment.
+
+        Args:
+            ack_id: The AckId of the message
+            should_ack: True to acknowledge (commit), False to nack (don't commit)
+        """
         if ack_id not in self._pending_acks:
             logger.warning(f"Ack ID {ack_id} not found in pending acks")
             return
 
         ack_info = self._pending_acks.pop(ack_id)
 
-        # Commit the offset + 1 (next message to read)
-        tp = TopicPartition(ack_info['topic'], ack_info['partition'], ack_info['offset'] + 1)
-        self._consumer.commit(offsets=[tp], asynchronous=False)
-        logger.debug(f"Committed offset {ack_info['offset'] + 1} for partition {ack_info['partition']}")
-
-    def _nack_message(self, ack_id: str):
-        """Handle negative acknowledgment - for Kafka, we just don't commit."""
-        if ack_id in self._pending_acks:
-            # Remove from pending but don't commit - message will be redelivered on restart
-            self._pending_acks.pop(ack_id)
+        if should_ack:
+            # Commit the offset + 1 (next message to read)
+            tp = TopicPartition(ack_info['topic'], ack_info['partition'], ack_info['offset'] + 1)
+            self._consumer.commit(offsets=[tp], asynchronous=False)
+            logger.debug(f"Committed offset {ack_info['offset'] + 1} for partition {ack_info['partition']}")
+        else:
+            # Nack - just don't commit, message will be redelivered on restart
             logger.debug(f"Nacked message {ack_id} - offset not committed")
 
     async def read(self) -> List[Message]:
