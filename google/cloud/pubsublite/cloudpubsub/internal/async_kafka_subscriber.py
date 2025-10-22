@@ -24,7 +24,6 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from google.cloud.pubsublite.cloudpubsub.internal.single_subscriber import (
     AsyncSingleSubscriber,
 )
-from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
 from google.cloud.pubsublite.cloudpubsub.internal.wrapped_message import WrappedMessage
 from google.cloud.pubsublite.types import FlowControlSettings
 
@@ -46,7 +45,7 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
 
     def __init__(
         self,
-        kafka_config: KafkaConfig,
+        kafka_config: Dict[str, Any],
         topic_name: str,
         consumer_group: str,
         flow_control_settings: Optional[FlowControlSettings] = None,
@@ -55,7 +54,7 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
         Initialize the Kafka subscriber.
 
         Args:
-            kafka_config: Configuration for Kafka connection
+            kafka_config: Kafka consumer configuration dict
             topic_name: Name of the Kafka topic to consume from
             consumer_group: Consumer group ID
             flow_control_settings: Flow control settings for message consumption
@@ -79,16 +78,16 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
 
     def _create_consumer_config(self) -> Dict[str, Any]:
         """Create the confluent-kafka Consumer configuration."""
-        config = self._kafka_config.consumer_config.copy() if hasattr(self._kafka_config, 'consumer_config') else self._kafka_config.producer_config.copy()
+        config = self._kafka_config.copy()
 
         # Override with consumer-specific settings
-        config.update({
-            'group.id': self._consumer_group,
-            'enable.auto.commit': False,  # Manual commit on ack()
-            'auto.offset.reset': 'earliest',
-            'session.timeout.ms': 30000,
-            'max.poll.records': str(self._flow_control.messages_outstanding),
-        })
+        # config.update({
+        #     'group.id': self._consumer_group,
+        #     'enable.auto.commit': False,  # Manual commit on ack()
+        #     'auto.offset.reset': 'earliest',
+        #     'session.timeout.ms': 30000,
+        #     'max.poll.records': str(self._flow_control.messages_outstanding),
+        # })
 
         return config
 

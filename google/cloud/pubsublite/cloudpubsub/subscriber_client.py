@@ -24,14 +24,6 @@ from google.cloud.pubsublite.cloudpubsub.reassignment_handler import Reassignmen
 from google.cloud.pubsublite.cloudpubsub.internal.make_subscriber import (
     make_async_subscriber,
 )
-
-# Optional Kafka imports
-try:
-    from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
-    KAFKA_AVAILABLE = True
-except ImportError:
-    KafkaConfig = None
-    KAFKA_AVAILABLE = False
 from google.cloud.pubsublite.cloudpubsub.internal.multiplexed_async_subscriber_client import (
     MultiplexedAsyncSubscriberClient,
 )
@@ -55,41 +47,6 @@ from google.cloud.pubsublite.types import (
     SubscriptionPath,
 )
 from overrides import overrides
-
-
-def _create_kafka_consumer_config(
-    consumer_config: Optional[Dict[str, Any]] = None,
-    consumer_group: Optional[str] = None,
-) -> KafkaConfig:
-    """
-    Create a KafkaConfig for consumer with the provided parameters.
-
-    Args:
-        consumer_config: Complete Kafka consumer configuration
-        consumer_group: Consumer group ID
-
-    Returns:
-        KafkaConfig instance
-    """
-    if not KAFKA_AVAILABLE:
-        raise ImportError(
-            "Kafka functionality requested but confluent-kafka is not installed. "
-            "Install with: pip install google-cloud-pubsublite[kafka]"
-        )
-
-    if not consumer_config:
-        raise ValueError(
-            "kafka_consumer_config is required when using Kafka backend. "
-            "Please provide a complete Kafka consumer configuration including "
-            "'bootstrap.servers' and authentication settings."
-        )
-
-    if 'bootstrap.servers' not in consumer_config:
-        raise ValueError(
-            "kafka_consumer_config must contain 'bootstrap.servers'"
-        )
-
-    return KafkaConfig(consumer_config=consumer_config)
 
 
 class SubscriberClient(SubscriberClientInterface, ConstructableFromServiceAccount):
@@ -228,13 +185,8 @@ class AsyncSubscriberClient(
             kafka_consumer_config: Kafka consumer configuration options. Must contain 'bootstrap.servers' when using Kafka backend.
             consumer_group: Consumer group ID for Kafka. If not provided, uses subscription name.
         """
-        # Create Kafka config if using Kafka backend
-        kafka_config = None
-        if use_kafka:
-            kafka_config = _create_kafka_consumer_config(
-                consumer_config=kafka_consumer_config,
-                consumer_group=consumer_group,
-            )
+        # Pass Kafka config directly if using Kafka backend
+        kafka_config = kafka_consumer_config if use_kafka else None
 
         self._impl = MultiplexedAsyncSubscriberClient(
             lambda subscription, partitions, settings: make_async_subscriber(

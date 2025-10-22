@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Mapping, Set, AsyncIterator, Callable
+from typing import Optional, Mapping, Set, AsyncIterator, Callable, Dict, Any
 from uuid import uuid4
 
 from google.api_core.client_options import ClientOptions
@@ -78,7 +78,6 @@ from google.cloud.pubsublite_v1.services.subscriber_service.async_client import 
 from google.cloud.pubsublite_v1.services.partition_assignment_service.async_client import (
     PartitionAssignmentServiceAsyncClient,
 )
-from google.cloud.pubsublite.cloudpubsub.internal.kafka_config import KafkaConfig
 
 try:
     from google.cloud.pubsublite.cloudpubsub.internal.async_kafka_subscriber import (
@@ -200,7 +199,7 @@ def make_async_subscriber(
     client_options: Optional[ClientOptions] = None,
     metadata: Optional[Mapping[str, str]] = None,
     use_kafka: bool = False,
-    kafka_config: Optional[KafkaConfig] = None,
+    kafka_config: Optional[Dict[str, Any]] = None,
     consumer_group: Optional[str] = None,
 ) -> AsyncSingleSubscriber:
     """
@@ -218,7 +217,7 @@ def make_async_subscriber(
       client_options: Other options to pass to the client. Note that if you pass any you must set api_endpoint.
       metadata: Additional metadata to send with the RPC.
       use_kafka: If True, use Kafka backend instead of Pub/Sub Lite.
-      kafka_config: Configuration for Kafka backend. Required if use_kafka is True.
+      kafka_config: Kafka consumer configuration dict. Required if use_kafka is True.
       consumer_group: Consumer group ID for Kafka. If not provided, uses subscription name.
 
     Returns:

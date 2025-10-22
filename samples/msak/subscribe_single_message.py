@@ -138,7 +138,7 @@ def subscribe_messages(
     # Set up signal handler for graceful shutdown
     streaming_pull_future = None
 
-    def signal_handler(sig, frame):
+    def signal_handler(_sig, _frame):
         print("\n\nShutting down subscriber...")
         if streaming_pull_future:
             streaming_pull_future.cancel()
