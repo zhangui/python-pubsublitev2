@@ -242,7 +242,7 @@ if __name__ == "__main__":
     parser.add_argument("--subscription", default="testtopic", help="Subscription/topic name")
     parser.add_argument("--project-id", default="ygnahz-eg-codelab", help="Google Cloud project ID")
     parser.add_argument("--location", default="us-central1", help="Cloud location")
-    parser.add_argument("--partition", type=int, default=0, help="Partition to subscribe from")
+    parser.add_argument("--partition", type=int, default=2, help="Partition to subscribe from")
     parser.add_argument("--consumer-group", help="Consumer group ID (optional)")
     parser.add_argument(
         "--duration",
