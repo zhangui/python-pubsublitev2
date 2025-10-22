@@ -138,10 +138,7 @@ class SubscriberClient(SubscriberClientInterface, ConstructableFromServiceAccoun
         # Create Kafka config if using Kafka backend
         kafka_config = None
         if use_kafka:
-            kafka_config = _create_kafka_consumer_config(
-                consumer_config=kafka_consumer_config,
-                consumer_group=consumer_group,
-            )
+            kafka_config = kafka_consumer_config
 
         self._impl = MultiplexedSubscriberClient(
             executor,
