@@ -138,7 +138,8 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
             ack_handler=lambda id, ack: self._handle_ack(id, ack),
         )
 
-        return Message(wrapped._pb, ack_id.encode(), 0, None)
+        # WrappedMessage already inherits from Message, so return it directly
+        return wrapped
 
     def _handle_ack(self, ack_id: AckId, should_ack: bool):
         """Handle message acknowledgment.
