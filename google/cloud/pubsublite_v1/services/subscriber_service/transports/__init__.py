@@ -19,15 +19,18 @@ from typing import Dict, Type
 from .base import SubscriberServiceTransport
 from .grpc import SubscriberServiceGrpcTransport
 from .grpc_asyncio import SubscriberServiceGrpcAsyncIOTransport
+from .kafka import SubscriberServiceKafkaTransport
 
 
 # Compile a registry of transports.
 _transport_registry = OrderedDict()  # type: Dict[str, Type[SubscriberServiceTransport]]
 _transport_registry["grpc"] = SubscriberServiceGrpcTransport
 _transport_registry["grpc_asyncio"] = SubscriberServiceGrpcAsyncIOTransport
+_transport_registry["kafka"] = SubscriberServiceKafkaTransport
 
 __all__ = (
     "SubscriberServiceTransport",
     "SubscriberServiceGrpcTransport",
     "SubscriberServiceGrpcAsyncIOTransport",
+    "SubscriberServiceKafkaTransport",
 )
