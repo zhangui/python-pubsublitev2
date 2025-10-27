@@ -91,10 +91,12 @@ def create_topic(
 
     print(f"\nCreating topic '{topic_id}' with {num_partitions} partitions...")
 
+    from google.cloud.pubsublite_v1.types import common
+
     topic = client.create_topic(
         parent=parent,
-        topic=pubsublite_v1.Topic(
-            partition_config=pubsublite_v1.Topic.PartitionConfig(
+        topic=common.Topic(
+            partition_config=common.Topic.PartitionConfig(
                 count=num_partitions
             )
         ),

@@ -113,15 +113,15 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
         """Build full topic path from location and topic name."""
         return f"{location_path}/topics/{topic_name}"
 
-    def _kafka_to_pubsublite_topic(self, topic_name: str, topic_metadata, location_path: str) -> admin.Topic:
+    def _kafka_to_pubsublite_topic(self, topic_name: str, topic_metadata, location_path: str) -> common.Topic:
         """Convert Kafka topic metadata to Pub/Sub Lite Topic proto."""
         num_partitions = len(topic_metadata.partitions)
 
-        return admin.Topic(
+        return common.Topic(
             name=self._build_topic_path(location_path, topic_name),
-            partition_config=admin.Topic.PartitionConfig(
+            partition_config=common.Topic.PartitionConfig(
                 count=num_partitions,
-                capacity=admin.Topic.PartitionConfig.Capacity(
+                capacity=common.Topic.PartitionConfig.Capacity(
                     publish_mib_per_sec=4,  # Default value
                     subscribe_mib_per_sec=8,  # Default value
                 ),
@@ -131,10 +131,10 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def create_topic(
         self,
-    ) -> Callable[[admin.CreateTopicRequest], admin.Topic]:
+    ) -> Callable[[admin.CreateTopicRequest], common.Topic]:
         """Return callable for create_topic operation."""
         if "create_topic" not in self._stubs:
-            def _create_topic(request: admin.CreateTopicRequest, **kwargs) -> admin.Topic:
+            def _create_topic(request: admin.CreateTopicRequest, **kwargs) -> common.Topic:
                 """Create a Kafka topic."""
                 topic_name = request.topic_id
                 location_path = request.parent
@@ -158,11 +158,11 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
                 fs[topic_name].result()
 
                 # Return Topic proto
-                return admin.Topic(
+                return common.Topic(
                     name=self._build_topic_path(location_path, topic_name),
-                    partition_config=admin.Topic.PartitionConfig(
+                    partition_config=common.Topic.PartitionConfig(
                         count=num_partitions,
-                        capacity=admin.Topic.PartitionConfig.Capacity(
+                        capacity=common.Topic.PartitionConfig.Capacity(
                             publish_mib_per_sec=4,
                             subscribe_mib_per_sec=8,
                         ),
@@ -176,10 +176,10 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def get_topic(
         self,
-    ) -> Callable[[admin.GetTopicRequest], admin.Topic]:
+    ) -> Callable[[admin.GetTopicRequest], common.Topic]:
         """Return callable for get_topic operation."""
         if "get_topic" not in self._stubs:
-            def _get_topic(request: admin.GetTopicRequest, **kwargs) -> admin.Topic:
+            def _get_topic(request: admin.GetTopicRequest, **kwargs) -> common.Topic:
                 """Get a Kafka topic."""
                 topic_name = self._extract_topic_name(request.name)
                 location_path = self._extract_location_path(request.name)
@@ -254,10 +254,10 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def update_topic(
         self,
-    ) -> Callable[[admin.UpdateTopicRequest], admin.Topic]:
+    ) -> Callable[[admin.UpdateTopicRequest], common.Topic]:
         """Return callable for update_topic operation."""
         if "update_topic" not in self._stubs:
-            def _update_topic(request: admin.UpdateTopicRequest, **kwargs) -> admin.Topic:
+            def _update_topic(request: admin.UpdateTopicRequest, **kwargs) -> common.Topic:
                 """Update a Kafka topic."""
                 topic_name = self._extract_topic_name(request.topic.name)
 
@@ -324,7 +324,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def create_subscription(
         self,
-    ) -> Callable[[admin.CreateSubscriptionRequest], admin.Subscription]:
+    ) -> Callable[[admin.CreateSubscriptionRequest], common.Subscription]:
         """Return callable for create_subscription operation."""
         if "create_subscription" not in self._stubs:
             def _create_subscription(request: admin.CreateSubscriptionRequest, **kwargs):
@@ -346,7 +346,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
                     raise NotFound(f"Topic not found: {topic_name}")
 
                 # Return Subscription proto
-                return admin.Subscription(
+                return common.Subscription(
                     name=f"{location_path}/subscriptions/{subscription_id}",
                     topic=request.subscription.topic,
                 )
@@ -358,14 +358,14 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def get_subscription(
         self,
-    ) -> Callable[[admin.GetSubscriptionRequest], admin.Subscription]:
+    ) -> Callable[[admin.GetSubscriptionRequest], common.Subscription]:
         """Return callable for get_subscription operation."""
         if "get_subscription" not in self._stubs:
             def _get_subscription(request: admin.GetSubscriptionRequest, **kwargs):
                 """Get subscription (consumer group) details."""
                 # For MVP, return minimal subscription info
                 # Would need to use describe_consumer_groups() for full implementation
-                return admin.Subscription(name=request.name)
+                return common.Subscription(name=request.name)
 
             self._stubs["get_subscription"] = _get_subscription
 
@@ -389,7 +389,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def update_subscription(
         self,
-    ) -> Callable[[admin.UpdateSubscriptionRequest], admin.Subscription]:
+    ) -> Callable[[admin.UpdateSubscriptionRequest], common.Subscription]:
         """Return callable for update_subscription operation."""
         if "update_subscription" not in self._stubs:
             def _update_subscription(request: admin.UpdateSubscriptionRequest, **kwargs):
@@ -438,7 +438,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def create_reservation(
         self,
-    ) -> Callable[[admin.CreateReservationRequest], admin.Reservation]:
+    ) -> Callable[[admin.CreateReservationRequest], common.Reservation]:
         """Return callable for create_reservation - not supported."""
         def _not_supported(request, **kwargs):
             raise NotImplementedError(
@@ -450,7 +450,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def get_reservation(
         self,
-    ) -> Callable[[admin.GetReservationRequest], admin.Reservation]:
+    ) -> Callable[[admin.GetReservationRequest], common.Reservation]:
         """Return callable for get_reservation - not supported."""
         return self.create_reservation  # Same not supported handler
 
@@ -464,7 +464,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
     @property
     def update_reservation(
         self,
-    ) -> Callable[[admin.UpdateReservationRequest], admin.Reservation]:
+    ) -> Callable[[admin.UpdateReservationRequest], common.Reservation]:
         """Return callable for update_reservation - not supported."""
         return self.create_reservation  # Same not supported handler
 
