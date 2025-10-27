@@ -32,7 +32,7 @@ logging.basicConfig(
 
 
 def create_admin_client(
-    cluster_id: str,
+    cluster_id: str = "testpsl",
     project_id: str = "ygnahz-eg-codelab",
     location: str = "us-central1",
 ) -> pubsublite_v1.AdminServiceClient:
@@ -171,10 +171,10 @@ def delete_topic(
 
 
 def demo_admin_operations(
-    cluster_id: str,
+    cluster_id: str = "testpsl",
     project_id: str = "ygnahz-eg-codelab",
     location: str = "us-central1",
-    topic_id: str = "test-admin-topic",
+    topic_id: str = "testtopic",
 ):
     """Demonstrate admin operations.
 
@@ -223,8 +223,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--cluster-id",
-        required=True,
-        help="Managed Kafka cluster ID (REQUIRED)"
+        default="testpsl",
+        help="Managed Kafka cluster ID"
     )
     parser.add_argument(
         "--project-id",
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--topic-id",
-        default="test-admin-topic",
+        default="testtopic",
         help="Topic name for demo operations"
     )
 
