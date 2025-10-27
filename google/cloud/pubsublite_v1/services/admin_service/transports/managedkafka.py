@@ -130,10 +130,17 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
         location_path: str
     ) -> common.Topic:
         """Convert Managed Kafka Topic to Pub/Sub Lite Topic proto."""
+        if mk_topic is None:
+            raise ValueError("mk_topic is None - API returned no topic")
+
+        logger.debug(f"Converting Managed Kafka topic: {mk_topic.name}")
+        logger.debug(f"  partition_count: {mk_topic.partition_count}")
+        logger.debug(f"  replication_factor: {mk_topic.replication_factor}")
+
         # Extract topic ID from name: projects/.../clusters/.../topics/{id}
         topic_id = mk_topic.name.split('/')[-1]
 
-        # Get partition count from configs
+        # Get partition count
         partition_count = mk_topic.partition_count or 1
 
         return common.Topic(
@@ -155,29 +162,40 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
         if "create_topic" not in self._stubs:
             def _create_topic(request: admin.CreateTopicRequest, **kwargs) -> common.Topic:
                 """Create a Managed Kafka topic."""
-                project, location = self._extract_project_location(request.parent)
-                cluster_path = self._build_cluster_path(project, location)
+                try:
+                    project, location = self._extract_project_location(request.parent)
+                    cluster_path = self._build_cluster_path(project, location)
 
-                # Extract partition count
-                num_partitions = 1
-                if request.topic.partition_config:
-                    num_partitions = request.topic.partition_config.count or 1
+                    logger.info(f"Creating topic '{request.topic_id}' in cluster {self._cluster_id}")
 
-                # Create Managed Kafka Topic object
-                mk_topic = managedkafka_v1.Topic(
-                    partition_count=num_partitions,
-                    replication_factor=3,  # Default for Managed Kafka
-                )
+                    # Extract partition count
+                    num_partitions = 1
+                    if request.topic and request.topic.partition_config:
+                        num_partitions = request.topic.partition_config.count or 1
 
-                # Create the topic
-                created_topic = self._managed_kafka_client.create_topic(
-                    parent=cluster_path,
-                    topic_id=request.topic_id,
-                    topic=mk_topic,
-                )
+                    # Create Managed Kafka Topic object
+                    mk_topic = managedkafka_v1.Topic(
+                        partition_count=num_partitions,
+                        replication_factor=3,  # Default for Managed Kafka
+                    )
 
-                # Convert to Pub/Sub Lite format
-                return self._managedkafka_to_pubsublite_topic(created_topic, request.parent)
+                    # Create the topic
+                    created_topic = self._managed_kafka_client.create_topic(
+                        parent=cluster_path,
+                        topic_id=request.topic_id,
+                        topic=mk_topic,
+                    )
+
+                    logger.info(f"Topic created: {created_topic.name if created_topic else 'None'}")
+
+                    # Convert to Pub/Sub Lite format
+                    return self._managedkafka_to_pubsublite_topic(created_topic, request.parent)
+
+                except Exception as e:
+                    logger.error(f"Error creating topic: {e}")
+                    logger.error(f"Request parent: {request.parent}")
+                    logger.error(f"Request topic_id: {request.topic_id}")
+                    raise
 
             self._stubs["create_topic"] = _create_topic
 
@@ -241,20 +259,34 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
         if "list_topics" not in self._stubs:
             def _list_topics(request: admin.ListTopicsRequest, **kwargs) -> admin.ListTopicsResponse:
                 """List Managed Kafka topics."""
-                project, location = self._extract_project_location(request.parent)
-                cluster_path = self._build_cluster_path(project, location)
+                try:
+                    project, location = self._extract_project_location(request.parent)
+                    cluster_path = self._build_cluster_path(project, location)
 
-                # List topics in the cluster
-                response = self._managed_kafka_client.list_topics(parent=cluster_path)
+                    logger.info(f"Listing topics in cluster: {cluster_path}")
 
-                # Convert to Pub/Sub Lite format
-                topics = []
-                for mk_topic in response:
-                    topics.append(
-                        self._managedkafka_to_pubsublite_topic(mk_topic, request.parent)
-                    )
+                    # List topics in the cluster
+                    response = self._managed_kafka_client.list_topics(parent=cluster_path)
 
-                return admin.ListTopicsResponse(topics=topics)
+                    # Convert to Pub/Sub Lite format
+                    topics = []
+                    for i, mk_topic in enumerate(response):
+                        logger.debug(f"Processing topic {i+1}: {mk_topic.name if mk_topic else 'None'}")
+                        if mk_topic:
+                            topics.append(
+                                self._managedkafka_to_pubsublite_topic(mk_topic, request.parent)
+                            )
+                        else:
+                            logger.warning(f"Skipping None topic at index {i}")
+
+                    logger.info(f"Found {len(topics)} topics")
+                    return admin.ListTopicsResponse(topics=topics)
+
+                except Exception as e:
+                    logger.error(f"Error listing topics: {e}")
+                    logger.error(f"Request parent: {request.parent}")
+                    logger.error(f"Cluster path: {cluster_path if 'cluster_path' in locals() else 'not set'}")
+                    raise
 
             self._stubs["list_topics"] = _list_topics
 
@@ -373,10 +405,15 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                 )
 
                 # Return Subscription proto
-                return common.Subscription(
+                subscription = common.Subscription(
                     name=f"{request.parent}/subscriptions/{request.subscription_id}",
-                    topic=request.subscription.topic,
                 )
+
+                # Set topic if provided
+                if request.subscription and request.subscription.topic:
+                    subscription.topic = request.subscription.topic
+
+                return subscription
 
             self._stubs["create_subscription"] = _create_subscription
 
