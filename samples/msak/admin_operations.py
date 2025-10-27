@@ -36,7 +36,7 @@ def create_admin_client(
     project_id: str = "ygnahz-eg-codelab",
     location: str = "us-central1",
 ) -> pubsublite_v1.AdminServiceClient:
-    """Create AdminServiceClient with Managed Kafka transport.
+    """Create AdminServiceClient with Kafka transport.
 
     Args:
         cluster_id: Managed Kafka cluster ID
@@ -44,23 +44,23 @@ def create_admin_client(
         location: Cloud location
 
     Returns:
-        AdminServiceClient configured for Managed Kafka
+        AdminServiceClient configured for Kafka
     """
-    # Create admin config with cluster ID for managedkafka transport
+    # Create admin config with cluster ID for kafka transport
     admin_config = {
         'cluster_id': cluster_id,
     }
 
-    # Create client with managedkafka transport (uses Application Default Credentials)
+    # Create client with kafka transport (uses Application Default Credentials)
     print(f"Connecting to Managed Kafka cluster: {cluster_id}")
     print(f"Using Application Default Credentials")
 
     client = pubsublite_v1.AdminServiceClient(
-        transport="managedkafka",
+        transport="kafka",
         admin_config=admin_config,
     )
 
-    print("AdminServiceClient created successfully with Managed Kafka transport")
+    print("AdminServiceClient created successfully with Kafka transport")
     return client
 
 
@@ -184,7 +184,7 @@ def demo_admin_operations(
         location: Cloud location
         topic_id: Topic name to create/manipulate
     """
-    print(f"Creating AdminServiceClient for Managed Kafka...")
+    print(f"Creating AdminServiceClient for Kafka...")
     client = create_admin_client(cluster_id, project_id, location)
 
     try:
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Perform admin operations on MSAK using Managed Kafka transport"
+        description="Perform admin operations on MSAK using Kafka transport"
     )
     parser.add_argument(
         "--cluster-id",
