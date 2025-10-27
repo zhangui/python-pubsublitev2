@@ -33,8 +33,8 @@ logging.basicConfig(
 
 def create_admin_client(
     cluster_id: str,
-    project_id: str,
-    location: str,
+    project_id: str = "ygnahz-eg-codelab",
+    location: str = "us-central1",
 ) -> pubsublite_v1.AdminServiceClient:
     """Create AdminServiceClient with Managed Kafka transport.
 
@@ -172,8 +172,8 @@ def delete_topic(
 
 def demo_admin_operations(
     cluster_id: str,
-    project_id: str,
-    location: str,
+    project_id: str = "ygnahz-eg-codelab",
+    location: str = "us-central1",
     topic_id: str = "test-admin-topic",
 ):
     """Demonstrate admin operations.
