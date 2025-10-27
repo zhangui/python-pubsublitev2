@@ -244,7 +244,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--topic-id",
-        default="test-admin-topic",
+        default="testtopic",
         help="Topic name for demo operations"
     )
 
