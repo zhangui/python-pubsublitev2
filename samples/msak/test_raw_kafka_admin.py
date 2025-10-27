@@ -55,11 +55,27 @@ def test_raw_kafka_admin(bootstrap_servers: str):
 
     # Create Kafka admin config
     token_provider = TokenProvider()
+
+    # Wrap the oauth callback to see if it's being called
+    oauth_call_count = [0]
+    def oauth_callback_wrapper(oauth_config):
+        oauth_call_count[0] += 1
+        print(f"   [OAuth Callback] Called (count: {oauth_call_count[0]})")
+        try:
+            result = token_provider.get_token(oauth_config)
+            print(f"   [OAuth Callback] Token obtained successfully")
+            return result
+        except Exception as e:
+            print(f"   [OAuth Callback] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
     admin_config = {
         'bootstrap.servers': bootstrap_servers,
         'security.protocol': 'SASL_SSL',
         'sasl.mechanisms': 'OAUTHBEARER',
-        'oauth_cb': token_provider.get_token,
+        'oauth_cb': oauth_callback_wrapper,
         'socket.timeout.ms': 60000,
         'request.timeout.ms': 30000,
         'api.version.request.timeout.ms': 10000,
