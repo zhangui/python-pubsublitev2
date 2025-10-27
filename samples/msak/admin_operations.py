@@ -62,13 +62,22 @@ def create_admin_client(
         'security.protocol': 'SASL_SSL',
         'sasl.mechanisms': 'OAUTHBEARER',
         'oauth_cb': token_provider.get_token,
+        'socket.timeout.ms': 60000,  # 60 second socket timeout
+        'request.timeout.ms': 30000,  # 30 second request timeout
+        'api.version.request.timeout.ms': 10000,  # 10 second for API version requests
     }
 
     # Create client with Kafka transport
-    return pubsublite_v1.AdminServiceClient(
+    print(f"Connecting to Kafka at: {bootstrap_servers}")
+    print(f"Admin config keys: {list(admin_config.keys())}")
+
+    client = pubsublite_v1.AdminServiceClient(
         transport="kafka",
         admin_config=admin_config,
     )
+
+    print("AdminServiceClient created successfully with Kafka transport")
+    return client
 
 
 def create_topic(
@@ -196,6 +205,7 @@ def demo_admin_operations(
 
     try:
         # List existing topics
+        print("\nAttempting to list topics...")
         list_topics(client, project_id, location)
 
         # Create a new topic

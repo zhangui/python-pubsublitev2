@@ -78,8 +78,14 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
 
         # Store admin_config and create Kafka AdminClient
         self._admin_config = admin_config or {}
+
+        logger.info(f"Initializing Kafka AdminClient with config keys: {list(self._admin_config.keys())}")
+        logger.info(f"Bootstrap servers: {self._admin_config.get('bootstrap.servers', 'NOT SET')}")
+
         self._admin_client = AdminClient(self._admin_config)
         self._stubs = {}  # Cache: method_name -> callable
+
+        logger.info("Kafka AdminClient initialized successfully")
 
         # Call base __init__ without admin_config
         super().__init__(
@@ -185,7 +191,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
                 location_path = self._extract_location_path(request.name)
 
                 # Get topic metadata
-                metadata = self._admin_client.list_topics(topic=topic_name, timeout=10)
+                metadata = self._admin_client.list_topics(topic=topic_name, timeout=30)
 
                 if topic_name not in metadata.topics:
                     from google.api_core.exceptions import NotFound
@@ -209,7 +215,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
                 topic_name = self._extract_topic_name(request.name)
 
                 # Get topic metadata
-                metadata = self._admin_client.list_topics(topic=topic_name, timeout=10)
+                metadata = self._admin_client.list_topics(topic=topic_name, timeout=30)
 
                 if topic_name not in metadata.topics:
                     from google.api_core.exceptions import NotFound
@@ -233,8 +239,15 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
                 """List Kafka topics."""
                 location_path = request.parent
 
-                # Get all topics
-                metadata = self._admin_client.list_topics(timeout=10)
+                try:
+                    # Get all topics
+                    logger.info(f"Fetching topic metadata from Kafka...")
+                    metadata = self._admin_client.list_topics(timeout=30)
+                    logger.info(f"Successfully fetched metadata for {len(metadata.topics)} topics")
+                except Exception as e:
+                    from google.api_core.exceptions import GoogleAPICallError
+                    logger.error(f"Failed to list Kafka topics: {e}")
+                    raise GoogleAPICallError(f"Failed to list Kafka topics: {e}")
 
                 # Convert to Topic protos, filtering out internal topics
                 topics = []
@@ -268,7 +281,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
                         new_count = request.topic.partition_config.count
 
                         # Get current partition count
-                        metadata = self._admin_client.list_topics(topic=topic_name, timeout=10)
+                        metadata = self._admin_client.list_topics(topic=topic_name, timeout=30)
                         current_count = len(metadata.topics[topic_name].partitions)
 
                         if new_count > current_count:
@@ -337,7 +350,7 @@ class AdminServiceKafkaTransport(AdminServiceTransport):
                 topic_name = self._extract_topic_name(request.subscription.topic)
 
                 try:
-                    metadata = self._admin_client.list_topics(topic=topic_name, timeout=10)
+                    metadata = self._admin_client.list_topics(topic=topic_name, timeout=30)
                     if topic_name not in metadata.topics:
                         from google.api_core.exceptions import NotFound
                         raise NotFound(f"Topic not found: {topic_name}")
