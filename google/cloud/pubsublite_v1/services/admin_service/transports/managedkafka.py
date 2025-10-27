@@ -26,8 +26,20 @@ logger = logging.getLogger(__name__)
 
 try:
     from google.cloud import managedkafka_v1
+    from google.cloud.managedkafka_v1.types import (
+        CreateTopicRequest,
+        GetTopicRequest,
+        ListTopicsRequest,
+        UpdateTopicRequest,
+        DeleteTopicRequest,
+    )
 except ImportError:
     managedkafka_v1 = None
+    CreateTopicRequest = None
+    GetTopicRequest = None
+    ListTopicsRequest = None
+    UpdateTopicRequest = None
+    DeleteTopicRequest = None
 
 
 class AdminServiceManagedKafkaTransport(AdminServiceTransport):
@@ -164,7 +176,6 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                 """Create a Managed Kafka topic."""
                 try:
                     project, location = self._extract_project_location(request.parent)
-                    cluster_path = self._build_cluster_path(project, location)
 
                     logger.info(f"Creating topic '{request.topic_id}' in cluster {self._cluster_id}")
 
@@ -173,18 +184,25 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                     if request.topic and request.topic.partition_config:
                         num_partitions = request.topic.partition_config.count or 1
 
-                    # Create Managed Kafka Topic object
-                    mk_topic = managedkafka_v1.Topic(
-                        partition_count=num_partitions,
-                        replication_factor=3,  # Default for Managed Kafka
-                    )
+                    # Build paths using client helpers
+                    cluster_path = self._managed_kafka_client.cluster_path(project, location, self._cluster_id)
+                    topic_path = self._managed_kafka_client.topic_path(project, location, self._cluster_id, request.topic_id)
 
-                    # Create the topic
-                    created_topic = self._managed_kafka_client.create_topic(
+                    # Create Managed Kafka Topic object with name set
+                    mk_topic = managedkafka_v1.Topic()
+                    mk_topic.name = topic_path
+                    mk_topic.partition_count = num_partitions
+                    mk_topic.replication_factor = 3  # Default for Managed Kafka
+
+                    # Wrap in request object
+                    mk_request = CreateTopicRequest(
                         parent=cluster_path,
                         topic_id=request.topic_id,
                         topic=mk_topic,
                     )
+
+                    # Call API with request object
+                    created_topic = self._managed_kafka_client.create_topic(request=mk_request)
 
                     logger.info(f"Topic created: {created_topic.name if created_topic else 'None'}")
 
@@ -211,13 +229,15 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                 """Get a Managed Kafka topic."""
                 project, location = self._extract_project_location(request.name)
                 topic_name = self._extract_topic_name(request.name)
-                cluster_path = self._build_cluster_path(project, location)
 
-                # Build full topic path
-                mk_topic_path = f"{cluster_path}/topics/{topic_name}"
+                # Build topic path using client helper
+                topic_path = self._managed_kafka_client.topic_path(project, location, self._cluster_id, topic_name)
+
+                # Wrap in request object
+                mk_request = GetTopicRequest(name=topic_path)
 
                 # Get the topic
-                mk_topic = self._managed_kafka_client.get_topic(name=mk_topic_path)
+                mk_topic = self._managed_kafka_client.get_topic(request=mk_request)
 
                 # Convert to Pub/Sub Lite format
                 location_path = f"projects/{project}/locations/{location}"
@@ -237,13 +257,15 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                 """Get partition count for a Managed Kafka topic."""
                 project, location = self._extract_project_location(request.name)
                 topic_name = self._extract_topic_name(request.name)
-                cluster_path = self._build_cluster_path(project, location)
 
-                # Build full topic path
-                mk_topic_path = f"{cluster_path}/topics/{topic_name}"
+                # Build topic path using client helper
+                topic_path = self._managed_kafka_client.topic_path(project, location, self._cluster_id, topic_name)
+
+                # Wrap in request object
+                mk_request = GetTopicRequest(name=topic_path)
 
                 # Get the topic
-                mk_topic = self._managed_kafka_client.get_topic(name=mk_topic_path)
+                mk_topic = self._managed_kafka_client.get_topic(request=mk_request)
 
                 return admin.TopicPartitions(partition_count=mk_topic.partition_count)
 
@@ -261,12 +283,17 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                 """List Managed Kafka topics."""
                 try:
                     project, location = self._extract_project_location(request.parent)
-                    cluster_path = self._build_cluster_path(project, location)
+
+                    # Build cluster path using client helper
+                    cluster_path = self._managed_kafka_client.cluster_path(project, location, self._cluster_id)
 
                     logger.info(f"Listing topics in cluster: {cluster_path}")
 
+                    # Wrap in request object
+                    mk_request = ListTopicsRequest(parent=cluster_path)
+
                     # List topics in the cluster
-                    response = self._managed_kafka_client.list_topics(parent=cluster_path)
+                    response = self._managed_kafka_client.list_topics(request=mk_request)
 
                     # Convert to Pub/Sub Lite format
                     topics = []
@@ -302,14 +329,16 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                 """Update a Managed Kafka topic."""
                 project, location = self._extract_project_location(request.topic.name)
                 topic_name = self._extract_topic_name(request.topic.name)
-                cluster_path = self._build_cluster_path(project, location)
 
-                # Build full topic path
-                mk_topic_path = f"{cluster_path}/topics/{topic_name}"
+                # Build topic path using client helper
+                topic_path = self._managed_kafka_client.topic_path(project, location, self._cluster_id, topic_name)
+
+                # Create topic object with name set
+                mk_topic = managedkafka_v1.Topic()
+                mk_topic.name = topic_path
 
                 # Update partition count if requested
                 update_mask = FieldMask()
-                mk_topic = managedkafka_v1.Topic(name=mk_topic_path)
 
                 for path in request.update_mask.paths:
                     if path == "partition_config.count":
@@ -318,11 +347,14 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                     else:
                         logger.warning(f"Update path '{path}' not supported for Managed Kafka topics")
 
-                # Update the topic
-                updated_topic = self._managed_kafka_client.update_topic(
+                # Wrap in request object
+                mk_request = UpdateTopicRequest(
                     update_mask=update_mask,
                     topic=mk_topic,
                 )
+
+                # Update the topic
+                updated_topic = self._managed_kafka_client.update_topic(request=mk_request)
 
                 # Convert to Pub/Sub Lite format
                 location_path = f"projects/{project}/locations/{location}"
@@ -342,13 +374,15 @@ class AdminServiceManagedKafkaTransport(AdminServiceTransport):
                 """Delete a Managed Kafka topic."""
                 project, location = self._extract_project_location(request.name)
                 topic_name = self._extract_topic_name(request.name)
-                cluster_path = self._build_cluster_path(project, location)
 
-                # Build full topic path
-                mk_topic_path = f"{cluster_path}/topics/{topic_name}"
+                # Build topic path using client helper
+                topic_path = self._managed_kafka_client.topic_path(project, location, self._cluster_id, topic_name)
+
+                # Wrap in request object
+                mk_request = DeleteTopicRequest(name=topic_path)
 
                 # Delete the topic
-                self._managed_kafka_client.delete_topic(name=mk_topic_path)
+                self._managed_kafka_client.delete_topic(request=mk_request)
 
             self._stubs["delete_topic"] = _delete_topic
 
