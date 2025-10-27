@@ -23,6 +23,7 @@ Default Credentials.
 """
 
 import logging
+import time
 from google.cloud import pubsublite_v1
 
 logging.basicConfig(
@@ -194,6 +195,10 @@ def demo_admin_operations(
 
         # Create a new topic
         create_topic(client, project_id, location, topic_id, num_partitions=3)
+
+        # Wait for topic creation to complete
+        print("\nWaiting for topic creation to propagate...")
+        time.sleep(3)
 
         # Get the topic details
         get_topic(client, project_id, location, topic_id)
