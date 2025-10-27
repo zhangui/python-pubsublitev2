@@ -48,6 +48,7 @@ dependencies = [
 
 kafka_dependencies = [
     "confluent-kafka >= 2.0.0, <3.0.0dev",
+    "google-cloud-managed-kafka >= 0.1.0",
 ]
 url = "https://github.com/googleapis/python-pubsublite"
 

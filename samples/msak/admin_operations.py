@@ -18,12 +18,11 @@
 Admin operations for Managed Service for Apache Kafka (MSAK) using AdminServiceClient.
 
 This sample demonstrates admin operations on Google Cloud's Managed Service for Apache Kafka
-using the Pub/Sub Lite v1 AdminServiceClient with Kafka transport and TokenProvider
-for OAuth authentication.
+using the Pub/Sub Lite v1 AdminServiceClient with Managed Kafka transport and Application
+Default Credentials.
 """
 
 import logging
-from typing import Optional
 from google.cloud import pubsublite_v1
 
 logging.basicConfig(
@@ -31,52 +30,37 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-try:
-    from tokenprovider import TokenProvider
-except ImportError:
-    TokenProvider = None
-
 
 def create_admin_client(
-    bootstrap_servers: str,
+    cluster_id: str,
     project_id: str,
     location: str,
 ) -> pubsublite_v1.AdminServiceClient:
-    """Create AdminServiceClient with Kafka transport.
+    """Create AdminServiceClient with Managed Kafka transport.
 
     Args:
-        bootstrap_servers: Kafka bootstrap servers
+        cluster_id: Managed Kafka cluster ID
         project_id: Google Cloud project ID
         location: Cloud location
 
     Returns:
-        AdminServiceClient configured for Kafka
+        AdminServiceClient configured for Managed Kafka
     """
-    if TokenProvider is None:
-        raise ImportError("TokenProvider not available")
-
-    # Create Kafka admin config with OAuth authentication
-    token_provider = TokenProvider()
+    # Create admin config with cluster ID for managedkafka transport
     admin_config = {
-        'bootstrap.servers': bootstrap_servers,
-        'security.protocol': 'SASL_SSL',
-        'sasl.mechanisms': 'OAUTHBEARER',
-        'oauth_cb': token_provider.get_token,
-        'socket.timeout.ms': 60000,  # 60 second socket timeout
-        'request.timeout.ms': 30000,  # 30 second request timeout
-        'api.version.request.timeout.ms': 10000,  # 10 second for API version requests
+        'cluster_id': cluster_id,
     }
 
-    # Create client with Kafka transport
-    print(f"Connecting to Kafka at: {bootstrap_servers}")
-    print(f"Admin config keys: {list(admin_config.keys())}")
+    # Create client with managedkafka transport (uses Application Default Credentials)
+    print(f"Connecting to Managed Kafka cluster: {cluster_id}")
+    print(f"Using Application Default Credentials")
 
     client = pubsublite_v1.AdminServiceClient(
-        transport="kafka",
+        transport="managedkafka",
         admin_config=admin_config,
     )
 
-    print("AdminServiceClient created successfully with Kafka transport")
+    print("AdminServiceClient created successfully with Managed Kafka transport")
     return client
 
 
@@ -187,7 +171,7 @@ def delete_topic(
 
 
 def demo_admin_operations(
-    bootstrap_servers: str,
+    cluster_id: str,
     project_id: str,
     location: str,
     topic_id: str = "test-admin-topic",
@@ -195,13 +179,13 @@ def demo_admin_operations(
     """Demonstrate admin operations.
 
     Args:
-        bootstrap_servers: Kafka bootstrap servers
+        cluster_id: Managed Kafka cluster ID
         project_id: Google Cloud project ID
         location: Cloud location
         topic_id: Topic name to create/manipulate
     """
-    print(f"Creating AdminServiceClient for Kafka...")
-    client = create_admin_client(bootstrap_servers, project_id, location)
+    print(f"Creating AdminServiceClient for Managed Kafka...")
+    client = create_admin_client(cluster_id, project_id, location)
 
     try:
         # List existing topics
@@ -235,12 +219,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Perform admin operations on MSAK using Kafka transport"
+        description="Perform admin operations on MSAK using Managed Kafka transport"
     )
     parser.add_argument(
-        "--bootstrap-servers",
-        default="bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092",
-        help="Kafka bootstrap servers"
+        "--cluster-id",
+        required=True,
+        help="Managed Kafka cluster ID (REQUIRED)"
     )
     parser.add_argument(
         "--project-id",
@@ -254,14 +238,16 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--topic-id",
-        default="testtopic",
+        default="test-admin-topic",
         help="Topic name for demo operations"
     )
 
     args = parser.parse_args()
 
+    print("\nMake sure you've run: gcloud auth application-default login\n")
+
     demo_admin_operations(
-        bootstrap_servers=args.bootstrap_servers,
+        cluster_id=args.cluster_id,
         project_id=args.project_id,
         location=args.location,
         topic_id=args.topic_id,
