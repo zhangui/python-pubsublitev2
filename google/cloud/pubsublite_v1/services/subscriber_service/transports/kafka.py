@@ -140,8 +140,6 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                     # Format: projects/*/locations/*/subscriptions/{name}
                     topic_name = subscription_name.split('/')[-1]
 
-                    logger.info(f"Initial request - subscription: {subscription_name}, partition: {partition}, topic: {topic_name}")
-
                     # Create cache key for this subscription:partition pair
                     cache_key = f"{subscription_name}:{partition}"
 
@@ -181,14 +179,10 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                 elif request.flow_control:
                     flow_tokens_messages += request.flow_control.allowed_messages
                     flow_tokens_bytes += request.flow_control.allowed_bytes
-                    logger.debug(f"Flow control granted: {request.flow_control.allowed_messages} messages, "
-                                f"{request.flow_control.allowed_bytes} bytes")
 
                     # If we have tokens and a subscriber, try to read messages
                     if kafka_sub and flow_tokens_messages > 0:
-                        # Read messages from Kafka
                         messages = loop.run_until_complete(kafka_sub.read())
-                        logger.info(f"Read {len(messages) if messages else 0} messages from Kafka")
 
                         if messages:
                             # Convert messages to SequencedMessage format
@@ -220,8 +214,6 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
 
                 # Handle seek requests (not implemented for Kafka yet)
                 elif request.seek:
-                    logger.warning("Seek requests not yet implemented for Kafka transport")
-                    # Could implement consumer.seek() here if needed
                     yield subscriber.SubscribeResponse(
                         seek=subscriber.SeekResponse(
                             cursor=common.Cursor(offset=0)

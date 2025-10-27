@@ -30,7 +30,6 @@ import sys
 from typing import Optional
 from google.cloud import pubsublite_v1
 
-# Enable logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'

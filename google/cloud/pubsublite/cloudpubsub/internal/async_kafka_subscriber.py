@@ -152,19 +152,13 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
             should_ack: True to acknowledge (commit), False to nack (don't commit)
         """
         if ack_id not in self._pending_acks:
-            logger.warning(f"Ack ID {ack_id} not found in pending acks")
             return
 
         ack_info = self._pending_acks.pop(ack_id)
 
         if should_ack:
-            # Commit the offset + 1 (next message to read)
             tp = TopicPartition(ack_info['topic'], ack_info['partition'], ack_info['offset'] + 1)
             self._consumer.commit(offsets=[tp], asynchronous=False)
-            logger.debug(f"Committed offset {ack_info['offset'] + 1} for partition {ack_info['partition']}")
-        else:
-            # Nack - just don't commit, message will be redelivered on restart
-            logger.debug(f"Nacked message {ack_id} - offset not committed")
 
     async def read(self) -> List[Message]:
         """
@@ -182,26 +176,36 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
         max_bytes = self._flow_control.bytes_outstanding
 
         # Poll for messages with timeout
-        while len(messages) < max_messages and bytes_read < max_bytes:
-            # Poll for a single message with short timeout
+        poll_attempts = 0
+        max_poll_attempts = 10
+
+        while len(messages) < max_messages and bytes_read < max_bytes and poll_attempts < max_poll_attempts:
+            poll_attempts += 1
+
+            # Trigger partition assignment on first poll
+            if poll_attempts == 1:
+                try:
+                    assignment = self._consumer.assignment()
+                    if assignment:
+                        for tp in assignment:
+                            self._consumer.committed([tp])
+                except Exception:
+                    pass
+
             kafka_msg = self._consumer.poll(timeout=0.1)
 
             if kafka_msg is None:
-                # No more messages available right now
                 if messages:
-                    break  # Return what we have
-                # If no messages yet, keep trying with async sleep
+                    break
                 await asyncio.sleep(0.01)
                 continue
 
             if kafka_msg.error():
                 if kafka_msg.error().code() == KafkaError._PARTITION_EOF:
-                    # End of partition, normal condition
                     break
                 else:
                     raise GoogleAPICallError(f"Kafka error: {kafka_msg.error()}")
 
-            # Convert and add message
             try:
                 pubsub_msg = self._kafka_to_pubsub_message(kafka_msg)
                 messages.append(pubsub_msg)
@@ -218,15 +222,10 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
             return self
 
         try:
-            # Create consumer with configuration
             config = self._create_consumer_config()
             self._consumer = Consumer(config)
-
-            # Subscribe to topic
             self._consumer.subscribe([self._topic_name])
-
             self._started = True
-            logger.info(f"Kafka consumer started for topic: {self._topic_name}, group: {self._consumer_group}")
             return self
         except Exception as e:
             raise GoogleAPICallError(f"Failed to start Kafka consumer: {e}")
@@ -238,14 +237,9 @@ class AsyncKafkaSubscriber(AsyncSingleSubscriber):
 
         try:
             if self._consumer:
-                # Commit any pending offsets
                 self._consumer.commit(asynchronous=False)
-
-                # Close consumer
                 self._consumer.close()
                 self._consumer = None
-
             self._started = False
-            logger.info(f"Kafka consumer stopped for topic: {self._topic_name}")
         except Exception as e:
             logger.error(f"Error stopping Kafka consumer: {e}")
