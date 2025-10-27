@@ -20,11 +20,17 @@ from .base import AdminServiceTransport
 from .grpc import AdminServiceGrpcTransport
 from .grpc_asyncio import AdminServiceGrpcAsyncIOTransport
 
+try:
+    from .kafka import AdminServiceKafkaTransport
+except ImportError:
+    AdminServiceKafkaTransport = None
 
 # Compile a registry of transports.
 _transport_registry = OrderedDict()  # type: Dict[str, Type[AdminServiceTransport]]
 _transport_registry["grpc"] = AdminServiceGrpcTransport
 _transport_registry["grpc_asyncio"] = AdminServiceGrpcAsyncIOTransport
+if AdminServiceKafkaTransport:
+    _transport_registry["kafka"] = AdminServiceKafkaTransport
 
 __all__ = (
     "AdminServiceTransport",

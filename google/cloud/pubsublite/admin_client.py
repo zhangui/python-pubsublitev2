@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict, Any
 
 from overrides import overrides
 from google.api_core.client_options import ClientOptions
@@ -57,6 +57,7 @@ class AdminClient(AdminClientInterface, ConstructableFromServiceAccount):
         credentials: Optional[Credentials] = None,
         transport: Optional[str] = None,
         client_options: Optional[ClientOptions] = None,
+        admin_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Create a new AdminClient.
@@ -66,6 +67,7 @@ class AdminClient(AdminClientInterface, ConstructableFromServiceAccount):
             credentials: The credentials to use when connecting.
             transport: The transport to use.
             client_options: The client options to use when connecting. If used, must explicitly set `api_endpoint`.
+            admin_config: Kafka admin configuration dict. Required when transport="kafka".
         """
         if client_options is None:
             client_options = ClientOptions(api_endpoint=regional_endpoint(region))
@@ -74,6 +76,7 @@ class AdminClient(AdminClientInterface, ConstructableFromServiceAccount):
                 client_options=client_options,
                 transport=transport,
                 credentials=credentials,
+                admin_config=admin_config,
             ),
             region,
         )
