@@ -25,12 +25,19 @@ try:
 except ImportError:
     AdminServiceKafkaTransport = None
 
+try:
+    from .managedkafka import AdminServiceManagedKafkaTransport
+except ImportError:
+    AdminServiceManagedKafkaTransport = None
+
 # Compile a registry of transports.
 _transport_registry = OrderedDict()  # type: Dict[str, Type[AdminServiceTransport]]
 _transport_registry["grpc"] = AdminServiceGrpcTransport
 _transport_registry["grpc_asyncio"] = AdminServiceGrpcAsyncIOTransport
 if AdminServiceKafkaTransport:
     _transport_registry["kafka"] = AdminServiceKafkaTransport
+if AdminServiceManagedKafkaTransport:
+    _transport_registry["managedkafka"] = AdminServiceManagedKafkaTransport
 
 __all__ = (
     "AdminServiceTransport",

@@ -79,6 +79,13 @@ try:
 except ImportError:
     HAS_KAFKA = False
 
+# Optional Managed Kafka imports
+try:
+    from .transports.managedkafka import AdminServiceManagedKafkaTransport
+    HAS_MANAGED_KAFKA = True
+except ImportError:
+    HAS_MANAGED_KAFKA = False
+
 
 class AdminServiceClientMeta(type):
     """Metaclass for the AdminService client.
@@ -93,6 +100,8 @@ class AdminServiceClientMeta(type):
     _transport_registry["grpc_asyncio"] = AdminServiceGrpcAsyncIOTransport
     if HAS_KAFKA:
         _transport_registry["kafka"] = AdminServiceKafkaTransport
+    if HAS_MANAGED_KAFKA:
+        _transport_registry["managedkafka"] = AdminServiceManagedKafkaTransport
 
     def get_transport_class(
         cls,
