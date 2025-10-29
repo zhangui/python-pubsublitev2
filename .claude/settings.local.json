@@ -5,7 +5,8 @@
       "Bash(nox -s unit:*)",
       "Bash(nox:*)",
       "WebFetch(domain:github.com)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []
