@@ -201,7 +201,7 @@ def streaming_commit_cursor(
         'security.protocol': 'SASL_SSL',
         'sasl.mechanisms': 'OAUTHBEARER',
         'oauth_cb': token_provider.get_token,
-        'group.id': f"pubsublite-cursor-{subscription_id}",
+        'group.id': subscription_id,
         'auto.offset.reset': 'earliest',
         'enable.auto.commit': False,
         'default_topic': topic,
