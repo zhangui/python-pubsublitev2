@@ -234,7 +234,7 @@ def main():
     parser.add_argument(
         "--operation",
         choices=["commit", "list", "streaming", "all"],
-        default="list",
+        default="all",
         help="Which operation to test"
     )
     parser.add_argument(
