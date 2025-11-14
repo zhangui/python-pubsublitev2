@@ -257,7 +257,7 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         # Parse subscription path: projects/{project}/locations/{location}/subscriptions/{subscription}
         parts = subscription_path.split('/')
         if len(parts) >= 6 and parts[-2] == 'subscriptions':
-            return f"pubsublite-cursor-{parts[-1]}"
+            return {parts[-1]}
         return subscription_path
 
     def _get_topic_from_subscription(self, subscription_path: str) -> str:
