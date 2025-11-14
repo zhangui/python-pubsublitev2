@@ -251,7 +251,7 @@ def main():
     )
     parser.add_argument(
         "--topic",
-        default="testadmin",
+        default="test-topic",
         help="Kafka topic name"
     )
 
