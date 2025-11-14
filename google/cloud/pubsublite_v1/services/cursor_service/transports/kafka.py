@@ -361,13 +361,7 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         Returns:
             Callable that handles commit cursor requests
         """
-        def _commit_cursor(
-            request: cursor.CommitCursorRequest,
-            *,
-            retry=None,
-            timeout=None,
-            metadata=(),
-        ) -> cursor.CommitCursorResponse:
+        def _commit_cursor(request: cursor.CommitCursorRequest, **kwargs) -> cursor.CommitCursorResponse:
             """Commit a cursor position.
 
             Args:
@@ -449,11 +443,7 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
             Callable that handles list partition cursors requests
         """
         def _list_partition_cursors(
-            request: cursor.ListPartitionCursorsRequest,
-            *,
-            retry=None,
-            timeout=None,
-            metadata=(),
+            request: cursor.ListPartitionCursorsRequest, **kwargs
         ) -> cursor.ListPartitionCursorsResponse:
             """List committed cursors for all partitions.
 
