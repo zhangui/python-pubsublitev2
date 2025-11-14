@@ -408,32 +408,45 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                         offset=request.cursor.offset + 1
                     )
 
-                    print(f"[DEBUG] Assigning partition and committing offset...")
+                    print(f"[DEBUG] Committing offset for partition {request.partition}...")
                     print(f"[DEBUG] TopicPartition: topic={tp.topic}, partition={tp.partition}, offset={tp.offset}")
 
-                    # For cursor operations, use assign() instead of subscribe()
-                    consumer.assign([tp])
-                    print(f"[DEBUG] Partition assigned successfully")
+                    # Subscribe to the topic to properly join the consumer group
+                    # This is required for the consumer group coordinator to be available
+                    if consumer_group not in self._consumer_subscriptions or topic not in self._consumer_subscriptions.get(consumer_group, set()):
+                        print(f"[DEBUG] Subscribing to topic {topic} to join consumer group...")
+                        consumer.subscribe([topic])
 
-                    # Poll to trigger coordinator connection
-                    # Even with assign(), commit() requires the coordinator to be ready
-                    print(f"[DEBUG] Polling to ensure coordinator is ready...")
-                    max_polls = 10
-                    for i in range(max_polls):
-                        msg = consumer.poll(timeout=1.0)
-                        if msg is not None and not msg.error():
-                            print(f"[DEBUG] Poll {i+1}: Got message, coordinator should be ready")
-                            break
-                        elif msg is not None and msg.error():
-                            print(f"[DEBUG] Poll {i+1}: Got error: {msg.error()}")
+                        # Track subscription
+                        if consumer_group not in self._consumer_subscriptions:
+                            self._consumer_subscriptions[consumer_group] = set()
+                        self._consumer_subscriptions[consumer_group].add(topic)
+
+                        # Poll until rebalance completes (consumer joins group)
+                        print(f"[DEBUG] Polling to complete consumer group rebalance...")
+                        max_polls = 20
+                        rebalanced = False
+                        for i in range(max_polls):
+                            msg = consumer.poll(timeout=1.0)
+                            if msg is None:
+                                print(f"[DEBUG] Poll {i+1}: No message, checking if rebalance complete...")
+                                # After a few polls with no messages, coordinator should be ready
+                                if i >= 3:
+                                    rebalanced = True
+                                    break
+                            elif msg.error():
+                                print(f"[DEBUG] Poll {i+1}: Error: {msg.error()}")
+                            else:
+                                print(f"[DEBUG] Poll {i+1}: Got message from partition {msg.partition()}")
+                                rebalanced = True
+                                break
+
+                        if rebalanced:
+                            print(f"[DEBUG] Consumer group rebalance completed after {i+1} poll(s)")
                         else:
-                            print(f"[DEBUG] Poll {i+1}: No message (waiting for coordinator...)")
-
-                        # Try to commit after a few polls
-                        if i >= 2:
-                            break
-
-                    print(f"[DEBUG] Coordinator should be ready after {i+1} poll(s)")
+                            print(f"[DEBUG] Proceeding after {max_polls} polls (may not be fully rebalanced)")
+                    else:
+                        print(f"[DEBUG] Consumer already subscribed to {topic}")
 
                     # Commit synchronously
                     print(f"[DEBUG] Attempting commit...")
