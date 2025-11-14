@@ -30,10 +30,12 @@ def commit_cursor(
     partition: int,
     offset: int,
     bootstrap_servers: str,
+    topic: str = None,
 ) -> None:
     """Commit a cursor position for a subscription partition."""
     print(f"\n=== Committing Cursor ===")
     print(f"Subscription: {subscription_id}")
+    print(f"Topic: {topic or 'default'}")
     print(f"Partition: {partition}")
     print(f"Offset: {offset}")
 
@@ -42,6 +44,10 @@ def commit_cursor(
         'bootstrap.servers': bootstrap_servers,
         'client.id': 'cursor-service-test',
     }
+
+    # Add default topic if specified
+    if topic:
+        consumer_config['default_topic'] = topic
 
     # Create CursorServiceClient with Kafka transport
     client = CursorServiceClient(
@@ -73,16 +79,22 @@ def list_partition_cursors(
     location: str,
     subscription_id: str,
     bootstrap_servers: str,
+    topic: str = None,
 ) -> None:
     """List committed cursors for all partitions of a subscription."""
     print(f"\n=== Listing Partition Cursors ===")
     print(f"Subscription: {subscription_id}")
+    print(f"Topic: {topic or 'default'}")
 
     # Configure Kafka consumer
     consumer_config = {
         'bootstrap.servers': bootstrap_servers,
         'client.id': 'cursor-service-test',
     }
+
+    # Add default topic if specified
+    if topic:
+        consumer_config['default_topic'] = topic
 
     # Create CursorServiceClient with Kafka transport
     client = CursorServiceClient(
@@ -125,10 +137,12 @@ def streaming_commit_cursor(
     start_offset: int,
     num_commits: int,
     bootstrap_servers: str,
+    topic: str = None,
 ) -> None:
     """Test streaming commit cursor with multiple commits."""
     print(f"\n=== Streaming Commit Cursor ===")
     print(f"Subscription: {subscription_id}")
+    print(f"Topic: {topic or 'default'}")
     print(f"Partition: {partition}")
     print(f"Starting offset: {start_offset}")
     print(f"Number of commits: {num_commits}")
@@ -138,6 +152,10 @@ def streaming_commit_cursor(
         'bootstrap.servers': bootstrap_servers,
         'client.id': 'cursor-service-test',
     }
+
+    # Add default topic if specified
+    if topic:
+        consumer_config['default_topic'] = topic
 
     # Create CursorServiceClient with Kafka transport
     client = CursorServiceClient(
@@ -231,6 +249,11 @@ def main():
         default=1,
         help="Offset to commit"
     )
+    parser.add_argument(
+        "--topic",
+        default="testadmin",
+        help="Kafka topic name"
+    )
 
     args = parser.parse_args()
 
@@ -243,6 +266,7 @@ def main():
     print(f"Location: {args.location}")
     print(f"Bootstrap Servers: {args.bootstrap_servers}")
     print(f"Subscription: {args.subscription_id}")
+    print(f"Topic: {args.topic}")
 
     try:
         if args.operation in ["commit", "all"]:
@@ -252,7 +276,8 @@ def main():
                 args.subscription_id,
                 args.partition,
                 args.offset,
-                args.bootstrap_servers
+                args.bootstrap_servers,
+                args.topic
             )
 
         if args.operation in ["list", "all"]:
@@ -260,7 +285,8 @@ def main():
                 args.project_id,
                 args.location,
                 args.subscription_id,
-                args.bootstrap_servers
+                args.bootstrap_servers,
+                args.topic
             )
 
         if args.operation in ["streaming", "all"]:
@@ -271,7 +297,8 @@ def main():
                 args.partition,
                 args.offset,
                 5,  # Number of commits
-                args.bootstrap_servers
+                args.bootstrap_servers,
+                args.topic
             )
 
         print("\n" + "=" * 60)
