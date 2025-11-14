@@ -31,6 +31,7 @@ from google.cloud.pubsublite_v1.services.cursor_service.transports.base import (
 )
 from google.cloud.pubsublite_v1.types import cursor
 from google.cloud.pubsublite_v1.types import common
+from google.longrunning import operations_pb2
 
 try:
     from confluent_kafka import Consumer, TopicPartition, KafkaException
@@ -550,6 +551,76 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 except Exception:
                     pass
             self._consumers.clear()
+
+    @property
+    def list_operations(
+        self,
+    ) -> Callable[
+        [operations_pb2.ListOperationsRequest],
+        operations_pb2.ListOperationsResponse,
+    ]:
+        """Return callable for list_operations.
+
+        Note: Operations are not supported for Kafka transport.
+        """
+        def _list_operations(
+            request: operations_pb2.ListOperationsRequest,
+        ) -> operations_pb2.ListOperationsResponse:
+            raise core_exceptions.Unimplemented(
+                "Operations are not supported for Kafka transport"
+            )
+        return _list_operations
+
+    @property
+    def get_operation(
+        self,
+    ) -> Callable[
+        [operations_pb2.GetOperationRequest],
+        operations_pb2.Operation,
+    ]:
+        """Return callable for get_operation.
+
+        Note: Operations are not supported for Kafka transport.
+        """
+        def _get_operation(
+            request: operations_pb2.GetOperationRequest,
+        ) -> operations_pb2.Operation:
+            raise core_exceptions.Unimplemented(
+                "Operations are not supported for Kafka transport"
+            )
+        return _get_operation
+
+    @property
+    def cancel_operation(
+        self,
+    ) -> Callable[[operations_pb2.CancelOperationRequest], None]:
+        """Return callable for cancel_operation.
+
+        Note: Operations are not supported for Kafka transport.
+        """
+        def _cancel_operation(
+            request: operations_pb2.CancelOperationRequest,
+        ) -> None:
+            raise core_exceptions.Unimplemented(
+                "Operations are not supported for Kafka transport"
+            )
+        return _cancel_operation
+
+    @property
+    def delete_operation(
+        self,
+    ) -> Callable[[operations_pb2.DeleteOperationRequest], None]:
+        """Return callable for delete_operation.
+
+        Note: Operations are not supported for Kafka transport.
+        """
+        def _delete_operation(
+            request: operations_pb2.DeleteOperationRequest,
+        ) -> None:
+            raise core_exceptions.Unimplemented(
+                "Operations are not supported for Kafka transport"
+            )
+        return _delete_operation
 
     @property
     def kind(self) -> str:
