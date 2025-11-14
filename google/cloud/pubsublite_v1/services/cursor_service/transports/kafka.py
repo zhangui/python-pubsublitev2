@@ -192,6 +192,7 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         self._streaming_handlers = {}  # Active streaming handlers
         self._lock = threading.Lock()
         self._stubs = {}  # Cache for callable stubs (like gRPC transport)
+        self._consumer_subscriptions = {}  # Track which topics each consumer is subscribed to
 
         # Allow topic override for subscriptions (since Kafka doesn't have subscription metadata)
         self._subscription_topics = {}
@@ -385,14 +386,17 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                     # Get consumer
                     consumer = self._get_consumer(consumer_group)
 
-                    # Subscribe if needed
-                    current_subscription = consumer.subscription()
-                    print(f"[DEBUG] Current subscription: {current_subscription}")
-                    if not current_subscription or topic not in current_subscription:
-                        print(f"[DEBUG] Subscribing to topic: {topic}")
+                    # Subscribe if needed (track subscriptions manually)
+                    if consumer_group not in self._consumer_subscriptions or topic not in self._consumer_subscriptions[consumer_group]:
+                        print(f"[DEBUG] Subscribing consumer group {consumer_group} to topic: {topic}")
                         try:
                             consumer.subscribe([topic])
                             print(f"[DEBUG] Subscribe successful")
+
+                            # Track the subscription
+                            if consumer_group not in self._consumer_subscriptions:
+                                self._consumer_subscriptions[consumer_group] = set()
+                            self._consumer_subscriptions[consumer_group].add(topic)
                         except Exception as e:
                             print(f"[ERROR] Subscribe failed: {e}")
                             raise
@@ -407,6 +411,8 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                                 print(f"[DEBUG] Poll returned message from partition {msg.partition()}")
                         else:
                             print(f"[DEBUG] Poll returned no message (normal for empty topic or offset at end)")
+                    else:
+                        print(f"[DEBUG] Consumer group {consumer_group} already subscribed to topic {topic}")
 
                     # Create TopicPartition with offset
                     # Kafka expects the next offset to read, so add 1
@@ -472,9 +478,12 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
 
                     # Subscribe to the topic to ensure the consumer is part of the group
                     # This is needed for committed() to work properly
-                    current_subscription = consumer.subscription()
-                    if not current_subscription or topic not in current_subscription:
+                    if consumer_group not in self._consumer_subscriptions or topic not in self._consumer_subscriptions[consumer_group]:
                         consumer.subscribe([topic])
+                        # Track the subscription
+                        if consumer_group not in self._consumer_subscriptions:
+                            self._consumer_subscriptions[consumer_group] = set()
+                        self._consumer_subscriptions[consumer_group].add(topic)
                         # Poll briefly to ensure subscription takes effect
                         consumer.poll(timeout=0.1)
 
