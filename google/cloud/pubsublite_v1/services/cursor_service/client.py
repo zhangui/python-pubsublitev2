@@ -83,6 +83,12 @@ class CursorServiceClientMeta(type):
     _transport_registry["grpc"] = CursorServiceGrpcTransport
     _transport_registry["grpc_asyncio"] = CursorServiceGrpcAsyncIOTransport
 
+    try:
+        from .transports.kafka import CursorServiceKafkaTransport
+        _transport_registry["kafka"] = CursorServiceKafkaTransport
+    except ImportError:
+        pass
+
     def get_transport_class(
         cls,
         label: Optional[str] = None,
