@@ -229,6 +229,12 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 if 'auto.offset.reset' not in config:
                     config['auto.offset.reset'] = 'earliest'
 
+                # Increase session timeout to allow more time for coordinator connection
+                if 'session.timeout.ms' not in config:
+                    config['session.timeout.ms'] = 30000  # 30 seconds
+                if 'max.poll.interval.ms' not in config:
+                    config['max.poll.interval.ms'] = 300000  # 5 minutes
+
                 print(f"[DEBUG] Creating consumer with config:")
                 print(f"  - bootstrap.servers: {config.get('bootstrap.servers', 'NOT SET')}")
                 print(f"  - group.id: {config.get('group.id', 'NOT SET')}")
@@ -237,8 +243,16 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 print(f"  - oauth_cb present: {'oauth_cb' in config}")
 
                 try:
-                    self._consumers[consumer_group] = Consumer(config)
+                    consumer = Consumer(config)
                     print(f"[DEBUG] Consumer created successfully")
+
+                    # Initialize the consumer by subscribing to a dummy topic or polling
+                    # This triggers coordinator connection
+                    print(f"[DEBUG] Initializing consumer (triggering coordinator connection)...")
+                    # Poll once to start the consumer group join process
+                    consumer.poll(timeout=0.1)
+
+                    self._consumers[consumer_group] = consumer
                 except Exception as e:
                     print(f"[ERROR] Failed to create consumer: {e}")
                     raise
@@ -398,11 +412,31 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                     print(f"[DEBUG] TopicPartition: topic={tp.topic}, partition={tp.partition}, offset={tp.offset}")
 
                     # For cursor operations, use assign() instead of subscribe()
-                    # assign() is synchronous and allows immediate commits without waiting for coordinator
                     consumer.assign([tp])
                     print(f"[DEBUG] Partition assigned successfully")
 
+                    # Poll to trigger coordinator connection
+                    # Even with assign(), commit() requires the coordinator to be ready
+                    print(f"[DEBUG] Polling to ensure coordinator is ready...")
+                    max_polls = 10
+                    for i in range(max_polls):
+                        msg = consumer.poll(timeout=1.0)
+                        if msg is not None and not msg.error():
+                            print(f"[DEBUG] Poll {i+1}: Got message, coordinator should be ready")
+                            break
+                        elif msg is not None and msg.error():
+                            print(f"[DEBUG] Poll {i+1}: Got error: {msg.error()}")
+                        else:
+                            print(f"[DEBUG] Poll {i+1}: No message (waiting for coordinator...)")
+
+                        # Try to commit after a few polls
+                        if i >= 2:
+                            break
+
+                    print(f"[DEBUG] Coordinator should be ready after {i+1} poll(s)")
+
                     # Commit synchronously
+                    print(f"[DEBUG] Attempting commit...")
                     consumer.commit(offsets=[tp], asynchronous=False)
                     print(f"[DEBUG] Commit successful")
 

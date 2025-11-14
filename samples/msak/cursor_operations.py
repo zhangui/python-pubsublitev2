@@ -257,6 +257,121 @@ def streaming_commit_cursor(
         raise
 
 
+def verify_cursor_commit(
+    project_id: str,
+    location: str,
+    subscription_id: str,
+    partition: int,
+    offset: int,
+    bootstrap_servers: str,
+    topic: str = None,
+) -> None:
+    """Verify that committing a cursor affects subsequent reads."""
+    if TokenProvider is None:
+        raise ImportError("TokenProvider not available. Ensure tokenprovider.py is in the same directory.")
+
+    print(f"\n=== Verifying Cursor Commit ===")
+    print(f"Step 1: Commit cursor at offset {offset}")
+
+    # First commit the cursor
+    commit_cursor(
+        project_id,
+        location,
+        subscription_id,
+        partition,
+        offset,
+        bootstrap_servers,
+        topic
+    )
+
+    print(f"\nStep 2: Read messages to verify they start from offset {offset}")
+
+    # Now create a consumer and verify it starts reading from the committed offset
+    try:
+        from confluent_kafka import Consumer, TopicPartition
+
+        token_provider = TokenProvider()
+        consumer_config = {
+            'bootstrap.servers': bootstrap_servers,
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'OAUTHBEARER',
+            'oauth_cb': token_provider.get_token,
+            'group.id': subscription_id,
+            'auto.offset.reset': 'earliest',
+            'enable.auto.commit': False,
+        }
+
+        print("[VERIFY] Creating Kafka consumer...")
+        consumer = Consumer(consumer_config)
+
+        # Subscribe to the topic
+        print(f"[VERIFY] Subscribing to topic {topic}...")
+        consumer.subscribe([topic])
+
+        # Poll once to join the consumer group
+        print("[VERIFY] Polling to join consumer group...")
+        consumer.poll(timeout=2.0)
+
+        # Check the committed offset
+        tp = TopicPartition(topic, partition)
+        committed = consumer.committed([tp], timeout=10.0)
+
+        if committed and len(committed) > 0:
+            committed_offset = committed[0].offset
+            print(f"[VERIFY] Committed offset for partition {partition}: {committed_offset}")
+
+            # In Kafka, committed offset is the NEXT offset to read
+            # So if we committed offset N, the committed value should be N+1
+            expected_committed = offset + 1
+            if committed_offset == expected_committed:
+                print(f"✓ Verification successful: Committed offset is {committed_offset} (next to read after {offset})")
+            else:
+                print(f"✗ Verification failed: Expected committed offset {expected_committed}, got {committed_offset}")
+        else:
+            print(f"✗ No committed offset found for partition {partition}")
+
+        # Now assign the partition and verify the position
+        print(f"[VERIFY] Assigning partition {partition}...")
+        consumer.assign([tp])
+
+        # Check the current position (where we'll read from next)
+        position = consumer.position([tp])
+        if position and len(position) > 0:
+            current_position = position[0].offset
+            print(f"[VERIFY] Current read position: {current_position}")
+
+            if current_position == offset + 1:
+                print(f"✓ Position verified: Consumer will read from offset {current_position}")
+            else:
+                print(f"⚠ Position is {current_position}, expected {offset + 1}")
+
+        # Try to read a message
+        print(f"[VERIFY] Attempting to read messages starting from offset {offset + 1}...")
+        msg = consumer.poll(timeout=5.0)
+
+        if msg is None:
+            print("[VERIFY] No messages available (topic may be empty or at end)")
+        elif msg.error():
+            print(f"[VERIFY] Error polling: {msg.error()}")
+        else:
+            print(f"✓ Read message: partition={msg.partition()}, offset={msg.offset()}, key={msg.key()}")
+            if msg.offset() >= offset + 1:
+                print(f"✓ Message offset {msg.offset()} is >= committed position {offset + 1}")
+            else:
+                print(f"⚠ Message offset {msg.offset()} is < committed position {offset + 1}")
+
+        consumer.close()
+        print("[VERIFY] Consumer closed")
+
+    except ImportError:
+        print("✗ confluent-kafka not available, skipping verification")
+    except Exception as e:
+        print(f"✗ Error during verification: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Test CursorService operations with Kafka backend"
@@ -283,7 +398,7 @@ def main():
     )
     parser.add_argument(
         "--operation",
-        choices=["commit", "list", "streaming", "all"],
+        choices=["commit", "list", "streaming", "verify", "all"],
         default="all",
         help="Which operation to test"
     )
@@ -366,6 +481,17 @@ def main():
                 args.partition,
                 args.offset,
                 5,  # Number of commits
+                args.bootstrap_servers,
+                args.topic
+            )
+
+        if args.operation == "verify":
+            verify_cursor_commit(
+                args.project_id,
+                args.location,
+                args.subscription_id,
+                args.partition,
+                args.offset,
                 args.bootstrap_servers,
                 args.topic
             )
