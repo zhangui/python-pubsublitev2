@@ -212,6 +212,10 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
             if consumer_group not in self._consumers:
                 config = self.consumer_config.copy()
 
+                # Remove default_topic as it's not a valid Kafka config parameter
+                if 'default_topic' in config:
+                    del config['default_topic']
+
                 # Override group.id with the specific consumer group
                 config['group.id'] = consumer_group
 
@@ -222,7 +226,19 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 if 'auto.offset.reset' not in config:
                     config['auto.offset.reset'] = 'earliest'
 
-                self._consumers[consumer_group] = Consumer(config)
+                print(f"[DEBUG] Creating consumer with config:")
+                print(f"  - bootstrap.servers: {config.get('bootstrap.servers', 'NOT SET')}")
+                print(f"  - group.id: {config.get('group.id', 'NOT SET')}")
+                print(f"  - security.protocol: {config.get('security.protocol', 'NOT SET')}")
+                print(f"  - sasl.mechanisms: {config.get('sasl.mechanisms', 'NOT SET')}")
+                print(f"  - oauth_cb present: {'oauth_cb' in config}")
+
+                try:
+                    self._consumers[consumer_group] = Consumer(config)
+                    print(f"[DEBUG] Consumer created successfully")
+                except Exception as e:
+                    print(f"[ERROR] Failed to create consumer: {e}")
+                    raise
 
             return self._consumers[consumer_group]
 
@@ -360,15 +376,34 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 consumer_group = self._extract_consumer_group(request.subscription)
                 topic = self._get_topic_from_subscription(request.subscription)
 
+                print(f"[DEBUG] Commit cursor - Group: {consumer_group}, Topic: {topic}, "
+                      f"Partition: {request.partition}, Offset: {request.cursor.offset}")
+
                 # Get consumer
                 consumer = self._get_consumer(consumer_group)
 
                 # Subscribe if needed
                 current_subscription = consumer.subscription()
+                print(f"[DEBUG] Current subscription: {current_subscription}")
                 if not current_subscription or topic not in current_subscription:
-                    consumer.subscribe([topic])
+                    print(f"[DEBUG] Subscribing to topic: {topic}")
+                    try:
+                        consumer.subscribe([topic])
+                        print(f"[DEBUG] Subscribe successful")
+                    except Exception as e:
+                        print(f"[ERROR] Subscribe failed: {e}")
+                        raise
+
                     # Poll briefly to ensure subscription takes effect
-                    consumer.poll(timeout=0.1)
+                    print(f"[DEBUG] Polling to ensure subscription...")
+                    msg = consumer.poll(timeout=1.0)
+                    if msg is not None:
+                        if msg.error():
+                            print(f"[DEBUG] Poll returned error: {msg.error()}")
+                        else:
+                            print(f"[DEBUG] Poll returned message from partition {msg.partition()}")
+                    else:
+                        print(f"[DEBUG] Poll returned no message (normal for empty topic or offset at end)")
 
                 # Create TopicPartition with offset
                 # Kafka expects the next offset to read, so add 1
@@ -378,13 +413,22 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                     offset=request.cursor.offset + 1
                 )
 
+                print(f"[DEBUG] Committing TopicPartition: topic={tp.topic}, partition={tp.partition}, offset={tp.offset}")
+
                 # Commit synchronously
                 consumer.commit(offsets=[tp], asynchronous=False)
+                print(f"[DEBUG] Commit successful")
 
                 return cursor.CommitCursorResponse()
 
             except KafkaException as e:
+                print(f"[ERROR] KafkaException during commit: {e}")
+                print(f"[ERROR] Error code: {e.args[0].code() if e.args else 'N/A'}")
+                print(f"[ERROR] Error name: {e.args[0].name() if e.args else 'N/A'}")
                 raise core_exceptions.InternalServerError(f"Kafka commit failed: {e}")
+            except Exception as e:
+                print(f"[ERROR] Unexpected exception during commit: {type(e).__name__}: {e}")
+                raise
 
         return _commit_cursor
 
