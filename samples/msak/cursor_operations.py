@@ -22,6 +22,11 @@ from google.cloud.pubsublite_v1.services.cursor_service import CursorServiceClie
 from google.cloud.pubsublite_v1.types import cursor as cursor_types
 from google.cloud.pubsublite_v1.types import common
 
+try:
+    from tokenprovider import TokenProvider
+except ImportError:
+    TokenProvider = None
+
 
 def commit_cursor(
     project_id: str,
@@ -33,21 +38,27 @@ def commit_cursor(
     topic: str = None,
 ) -> None:
     """Commit a cursor position for a subscription partition."""
+    if TokenProvider is None:
+        raise ImportError("TokenProvider not available. Ensure tokenprovider.py is in the same directory.")
+
     print(f"\n=== Committing Cursor ===")
     print(f"Subscription: {subscription_id}")
-    print(f"Topic: {topic or 'default'}")
+    print(f"Topic: {topic}")
     print(f"Partition: {partition}")
     print(f"Offset: {offset}")
 
-    # Configure Kafka consumer
+    # Configure Kafka consumer with OAuth authentication
+    token_provider = TokenProvider()
     consumer_config = {
         'bootstrap.servers': bootstrap_servers,
-        'client.id': 'cursor-service-test',
+        'security.protocol': 'SASL_SSL',
+        'sasl.mechanisms': 'OAUTHBEARER',
+        'oauth_cb': token_provider.get_token,
+        'group.id': f"pubsublite-cursor-{subscription_id}",
+        'auto.offset.reset': 'earliest',
+        'enable.auto.commit': False,
+        'default_topic': topic,
     }
-
-    # Add default topic if specified
-    if topic:
-        consumer_config['default_topic'] = topic
 
     # Create CursorServiceClient with Kafka transport
     client = CursorServiceClient(
@@ -67,7 +78,7 @@ def commit_cursor(
 
     try:
         # Commit the cursor
-        response = client.commit_cursor(request=request)
+        client.commit_cursor(request=request)
         print(f"✓ Successfully committed cursor at offset {offset}")
     except Exception as e:
         print(f"✗ Error committing cursor: {e}")
@@ -82,19 +93,25 @@ def list_partition_cursors(
     topic: str = None,
 ) -> None:
     """List committed cursors for all partitions of a subscription."""
+    if TokenProvider is None:
+        raise ImportError("TokenProvider not available. Ensure tokenprovider.py is in the same directory.")
+
     print(f"\n=== Listing Partition Cursors ===")
     print(f"Subscription: {subscription_id}")
-    print(f"Topic: {topic or 'default'}")
+    print(f"Topic: {topic}")
 
-    # Configure Kafka consumer
+    # Configure Kafka consumer with OAuth authentication
+    token_provider = TokenProvider()
     consumer_config = {
         'bootstrap.servers': bootstrap_servers,
-        'client.id': 'cursor-service-test',
+        'security.protocol': 'SASL_SSL',
+        'sasl.mechanisms': 'OAUTHBEARER',
+        'oauth_cb': token_provider.get_token,
+        'group.id': f"pubsublite-cursor-{subscription_id}",
+        'auto.offset.reset': 'earliest',
+        'enable.auto.commit': False,
+        'default_topic': topic,
     }
-
-    # Add default topic if specified
-    if topic:
-        consumer_config['default_topic'] = topic
 
     # Create CursorServiceClient with Kafka transport
     client = CursorServiceClient(
@@ -140,22 +157,28 @@ def streaming_commit_cursor(
     topic: str = None,
 ) -> None:
     """Test streaming commit cursor with multiple commits."""
+    if TokenProvider is None:
+        raise ImportError("TokenProvider not available. Ensure tokenprovider.py is in the same directory.")
+
     print(f"\n=== Streaming Commit Cursor ===")
     print(f"Subscription: {subscription_id}")
-    print(f"Topic: {topic or 'default'}")
+    print(f"Topic: {topic}")
     print(f"Partition: {partition}")
     print(f"Starting offset: {start_offset}")
     print(f"Number of commits: {num_commits}")
 
-    # Configure Kafka consumer
+    # Configure Kafka consumer with OAuth authentication
+    token_provider = TokenProvider()
     consumer_config = {
         'bootstrap.servers': bootstrap_servers,
-        'client.id': 'cursor-service-test',
+        'security.protocol': 'SASL_SSL',
+        'sasl.mechanisms': 'OAUTHBEARER',
+        'oauth_cb': token_provider.get_token,
+        'group.id': f"pubsublite-cursor-{subscription_id}",
+        'auto.offset.reset': 'earliest',
+        'enable.auto.commit': False,
+        'default_topic': topic,
     }
-
-    # Add default topic if specified
-    if topic:
-        consumer_config['default_topic'] = topic
 
     # Create CursorServiceClient with Kafka transport
     client = CursorServiceClient(

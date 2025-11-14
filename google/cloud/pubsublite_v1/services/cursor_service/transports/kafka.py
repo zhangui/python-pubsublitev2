@@ -211,15 +211,16 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         with self._lock:
             if consumer_group not in self._consumers:
                 config = self.consumer_config.copy()
-                config['group.id'] = consumer_group
-                config['enable.auto.commit'] = False
-                config['auto.offset.reset'] = 'earliest'
 
-                # Add OAuth if credentials are provided
-                if self._credentials:
-                    config['security.protocol'] = 'SASL_SSL'
-                    config['sasl.mechanism'] = 'OAUTHBEARER'
-                    # Token provider would be set up here
+                # Override group.id with the specific consumer group
+                config['group.id'] = consumer_group
+
+                # Ensure manual commit mode
+                config['enable.auto.commit'] = False
+
+                # Set offset reset if not already configured
+                if 'auto.offset.reset' not in config:
+                    config['auto.offset.reset'] = 'earliest'
 
                 self._consumers[consumer_group] = Consumer(config)
 
@@ -359,16 +360,12 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 consumer_group = self._extract_consumer_group(request.subscription)
                 topic = self._get_topic_from_subscription(request.subscription)
 
-                print(f"[DEBUG] Committing cursor for group: {consumer_group}, topic: {topic}, "
-                      f"partition: {request.partition}, offset: {request.cursor.offset}")
-
                 # Get consumer
                 consumer = self._get_consumer(consumer_group)
 
                 # Subscribe if needed
                 current_subscription = consumer.subscription()
                 if not current_subscription or topic not in current_subscription:
-                    print(f"[DEBUG] Subscribing consumer to topic: {topic}")
                     consumer.subscribe([topic])
                     # Poll briefly to ensure subscription takes effect
                     consumer.poll(timeout=0.1)
@@ -382,9 +379,7 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 )
 
                 # Commit synchronously
-                print(f"[DEBUG] Committing offset {tp.offset} for partition {tp.partition}")
                 consumer.commit(offsets=[tp], asynchronous=False)
-                print(f"[DEBUG] Commit successful")
 
                 return cursor.CommitCursorResponse()
 
@@ -420,8 +415,6 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 consumer_group = self._extract_consumer_group(request.parent)
                 topic = self._get_topic_from_subscription(request.parent)
 
-                print(f"[DEBUG] Listing cursors for consumer group: {consumer_group}, topic: {topic}")
-
                 # Get consumer
                 consumer = self._get_consumer(consumer_group)
 
@@ -429,7 +422,6 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 # This is needed for committed() to work properly
                 current_subscription = consumer.subscription()
                 if not current_subscription or topic not in current_subscription:
-                    print(f"[DEBUG] Subscribing consumer to topic: {topic}")
                     consumer.subscribe([topic])
                     # Poll briefly to ensure subscription takes effect
                     consumer.poll(timeout=0.1)
@@ -437,7 +429,6 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 # Get topic metadata to find all partitions
                 metadata = consumer.list_topics(topic, timeout=10)
                 if topic not in metadata.topics:
-                    print(f"[WARNING] Topic '{topic}' not found in cluster")
                     return cursor.ListPartitionCursorsResponse(
                         partition_cursors=[],
                         next_page_token=""
@@ -445,7 +436,6 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
 
                 topic_metadata = metadata.topics[topic]
                 partitions = list(topic_metadata.partitions.keys())
-                print(f"[DEBUG] Topic has {len(partitions)} partitions: {partitions}")
 
                 # Create TopicPartition objects for all partitions
                 topic_partitions = [
@@ -454,17 +444,12 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
 
                 # Get committed offsets
                 committed = consumer.committed(topic_partitions, timeout=10)
-                print(f"[DEBUG] Retrieved committed offsets for {len(committed)} partitions")
 
                 # Build response
                 partition_cursors = []
                 for tp in committed:
-                    print(f"[DEBUG] Partition {tp.partition}: offset={tp.offset}")
-
                     # Handle different offset states
-                    if tp.offset == -1001:  # OFFSET_INVALID
-                        # No committed offset for this partition, skip
-                        print(f"[DEBUG] No committed offset for partition {tp.partition}")
+                    if tp.offset == -1001:  # OFFSET_INVALID - no committed offset
                         continue
                     elif tp.offset is not None and tp.offset >= 0:
                         # Kafka offset is next to read, cursor is last read
@@ -475,8 +460,6 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                                 cursor=common.Cursor(offset=cursor_offset)
                             )
                         )
-
-                print(f"[DEBUG] Returning {len(partition_cursors)} partition cursors")
 
                 # Handle pagination (client-side since Kafka returns all)
                 page_size = request.page_size if request.page_size > 0 else len(partition_cursors)
