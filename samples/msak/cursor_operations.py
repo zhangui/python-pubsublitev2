@@ -48,7 +48,16 @@ def commit_cursor(
     print(f"Offset: {offset}")
 
     # Configure Kafka consumer with OAuth authentication
-    token_provider = TokenProvider()
+    print("[TEST] Creating TokenProvider...")
+    try:
+        token_provider = TokenProvider()
+        print("[TEST] TokenProvider created successfully")
+    except Exception as e:
+        print(f"[TEST ERROR] Failed to create TokenProvider: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
     consumer_config = {
         'bootstrap.servers': bootstrap_servers,
         'security.protocol': 'SASL_SSL',
@@ -59,28 +68,46 @@ def commit_cursor(
         'enable.auto.commit': False,
         'default_topic': topic,
     }
+    print(f"[TEST] Consumer config created: bootstrap={bootstrap_servers}")
 
     # Create CursorServiceClient with Kafka transport
-    client = CursorServiceClient(
-        transport="kafka",
-        consumer_config=consumer_config
-    )
+    print("[TEST] Creating CursorServiceClient with Kafka transport...")
+    try:
+        client = CursorServiceClient(
+            transport="kafka",
+            consumer_config=consumer_config
+        )
+        print("[TEST] Client created successfully")
+        print(f"[TEST] Client transport type: {type(client._transport).__name__}")
+    except Exception as e:
+        print(f"[TEST ERROR] Failed to create client: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
     # Build subscription path
     subscription_path = f"projects/{project_id}/locations/{location}/subscriptions/{subscription_id}"
+    print(f"[TEST] Subscription path: {subscription_path}")
 
     # Create commit request
+    print(f"[TEST] Creating CommitCursorRequest...")
     request = cursor_types.CommitCursorRequest(
         subscription=subscription_path,
         partition=partition,
         cursor=common.Cursor(offset=offset)
     )
+    print(f"[TEST] Request created: partition={request.partition}, offset={request.cursor.offset}")
 
     try:
         # Commit the cursor
-        client.commit_cursor(request=request)
+        print(f"[TEST] Calling client.commit_cursor()...")
+        response = client.commit_cursor(request=request)
+        print(f"[TEST] commit_cursor() returned: {response}")
         print(f"✓ Successfully committed cursor at offset {offset}")
     except Exception as e:
+        print(f"[TEST ERROR] Exception during commit_cursor: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         print(f"✗ Error committing cursor: {e}")
         raise
 
@@ -290,6 +317,25 @@ def main():
     print(f"Bootstrap Servers: {args.bootstrap_servers}")
     print(f"Subscription: {args.subscription_id}")
     print(f"Topic: {args.topic}")
+    print(f"Operation: {args.operation}")
+
+    # Check imports
+    print("\n[MAIN] Checking imports...")
+    print(f"[MAIN] CursorServiceClient: {CursorServiceClient}")
+    print(f"[MAIN] TokenProvider: {TokenProvider}")
+    print(f"[MAIN] cursor_types: {cursor_types}")
+    print(f"[MAIN] common: {common}")
+
+    # Check if Kafka transport is registered
+    print("\n[MAIN] Checking transport registry...")
+    try:
+        transport_class = CursorServiceClient.get_transport_class("kafka")
+        print(f"[MAIN] Kafka transport class: {transport_class}")
+    except KeyError as e:
+        print(f"[MAIN ERROR] Kafka transport not registered: {e}")
+        print(f"[MAIN] Available transports: {list(CursorServiceClient._transport_registry.keys())}")
+    except Exception as e:
+        print(f"[MAIN ERROR] Error checking transport: {e}")
 
     try:
         if args.operation in ["commit", "all"]:

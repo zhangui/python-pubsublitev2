@@ -7,7 +7,10 @@
       "WebFetch(domain:github.com)",
       "Bash(python3:*)",
       "Bash(awk:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(python3.12 -m nox:*)",
+      "Bash(pyenv local:*)",
+      "Bash(python3.12:*)"
     ],
     "deny": [],
     "ask": []
