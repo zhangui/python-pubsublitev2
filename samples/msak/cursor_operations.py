@@ -210,25 +210,25 @@ def main():
     )
     parser.add_argument(
         "--bootstrap-servers",
-        default="localhost:9092",
+        default="bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.google:9092",
         help="Kafka bootstrap servers"
     )
     parser.add_argument(
         "--operation",
         choices=["commit", "list", "streaming", "all"],
-        default="all",
+        default="list",
         help="Which operation to test"
     )
     parser.add_argument(
         "--partition",
         type=int,
-        default=0,
+        default=2,
         help="Partition number for commit operations"
     )
     parser.add_argument(
         "--offset",
         type=int,
-        default=100,
+        default=1,
         help="Offset to commit"
     )
 
