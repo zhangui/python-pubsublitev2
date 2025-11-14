@@ -350,6 +350,7 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
 
         return stream_handler
 
+    @property
     def commit_cursor(
         self,
     ) -> Callable[
@@ -431,6 +432,7 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
 
         return _commit_cursor
 
+    @property
     def list_partition_cursors(
         self,
     ) -> Callable[
