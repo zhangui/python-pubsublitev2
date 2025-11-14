@@ -363,6 +363,10 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         """
         def _commit_cursor(
             request: cursor.CommitCursorRequest,
+            *,
+            retry=None,
+            timeout=None,
+            metadata=(),
         ) -> cursor.CommitCursorResponse:
             """Commit a cursor position.
 
@@ -446,6 +450,10 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         """
         def _list_partition_cursors(
             request: cursor.ListPartitionCursorsRequest,
+            *,
+            retry=None,
+            timeout=None,
+            metadata=(),
         ) -> cursor.ListPartitionCursorsResponse:
             """List committed cursors for all partitions.
 
