@@ -20,11 +20,20 @@ from .base import CursorServiceTransport
 from .grpc import CursorServiceGrpcTransport
 from .grpc_asyncio import CursorServiceGrpcAsyncIOTransport
 
+# Import Kafka transport if available
+try:
+    from .kafka import CursorServiceKafkaTransport
+    HAS_KAFKA = True
+except ImportError:
+    HAS_KAFKA = False
+
 
 # Compile a registry of transports.
 _transport_registry = OrderedDict()  # type: Dict[str, Type[CursorServiceTransport]]
 _transport_registry["grpc"] = CursorServiceGrpcTransport
 _transport_registry["grpc_asyncio"] = CursorServiceGrpcAsyncIOTransport
+if HAS_KAFKA:
+    _transport_registry["kafka"] = CursorServiceKafkaTransport
 
 __all__ = (
     "CursorServiceTransport",

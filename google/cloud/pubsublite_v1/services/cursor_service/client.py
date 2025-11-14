@@ -543,6 +543,7 @@ class CursorServiceClient(metaclass=CursorServiceClientMeta):
         ] = None,
         client_options: Optional[Union[client_options_lib.ClientOptions, dict]] = None,
         client_info: gapic_v1.client_info.ClientInfo = DEFAULT_CLIENT_INFO,
+        consumer_config: Optional[Dict] = None,
     ) -> None:
         """Instantiates the cursor service client.
 
@@ -588,6 +589,9 @@ class CursorServiceClient(metaclass=CursorServiceClientMeta):
                 API requests. If ``None``, then default info will be used.
                 Generally, you only need to set this if you're developing
                 your own client library.
+            consumer_config (Optional[Dict]): Configuration for Kafka consumer
+                when using Kafka transport. Includes bootstrap servers and
+                security settings.
 
         Raises:
             google.auth.exceptions.MutualTLSChannelError: If mutual TLS transport
@@ -677,17 +681,22 @@ class CursorServiceClient(metaclass=CursorServiceClientMeta):
                 else cast(Callable[..., CursorServiceTransport], transport)
             )
             # initialize with the provided callable or the passed in class
-            self._transport = transport_init(
-                credentials=credentials,
-                credentials_file=self._client_options.credentials_file,
-                host=self._api_endpoint,
-                scopes=self._client_options.scopes,
-                client_cert_source_for_mtls=self._client_cert_source,
-                quota_project_id=self._client_options.quota_project_id,
-                client_info=client_info,
-                always_use_jwt_access=True,
-                api_audience=self._client_options.api_audience,
-            )
+            transport_kwargs = {
+                "credentials": credentials,
+                "credentials_file": self._client_options.credentials_file,
+                "host": self._api_endpoint,
+                "scopes": self._client_options.scopes,
+                "client_cert_source_for_mtls": self._client_cert_source,
+                "quota_project_id": self._client_options.quota_project_id,
+                "client_info": client_info,
+                "always_use_jwt_access": True,
+                "api_audience": self._client_options.api_audience,
+            }
+            # Add consumer_config for Kafka transport
+            if consumer_config and transport == "kafka":
+                transport_kwargs["consumer_config"] = consumer_config
+
+            self._transport = transport_init(**transport_kwargs)
 
         if "async" not in str(self._transport):
             if CLIENT_LOGGING_SUPPORTED and _LOGGER.isEnabledFor(
