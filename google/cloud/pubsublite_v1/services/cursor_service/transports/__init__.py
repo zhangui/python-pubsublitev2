@@ -20,14 +20,28 @@ from .base import CursorServiceTransport
 from .grpc import CursorServiceGrpcTransport
 from .grpc_asyncio import CursorServiceGrpcAsyncIOTransport
 
+# Define HAS_KAFKA to conditionally import Kafka transport
+try:
+    from .kafka import CursorServiceKafkaTransport
+    HAS_KAFKA = True
+except ImportError:
+    HAS_KAFKA = False
+
 
 # Compile a registry of transports.
 _transport_registry = OrderedDict()  # type: Dict[str, Type[CursorServiceTransport]]
 _transport_registry["grpc"] = CursorServiceGrpcTransport
 _transport_registry["grpc_asyncio"] = CursorServiceGrpcAsyncIOTransport
 
+if HAS_KAFKA:
+    _transport_registry["kafka"] = CursorServiceKafkaTransport
+
 __all__ = (
     "CursorServiceTransport",
     "CursorServiceGrpcTransport",
     "CursorServiceGrpcAsyncIOTransport",
+    "CursorServiceKafkaTransport" if HAS_KAFKA else None,
 )
+
+# Filter out None values in __all__
+__all__ = tuple(x for x in __all__ if x is not None)
