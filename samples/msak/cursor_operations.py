@@ -46,13 +46,9 @@ def create_cursor_client(
         CursorServiceClient configured for Kafka
     """
     # Create kafka config
-    token_provider = TokenProvider()
+    # token_provider = TokenProvider()
     kafka_config = {
-        'bootstrap.servers': bootstrap_servers,
-        'security.protocol': 'SASL_SSL',
-        'sasl.mechanisms': 'OAUTHBEARER',
-        'oauth_cb': token_provider.get_token,
-        'debug': 'security,broker,protocol', 
+        'cluster_id': cluster_id,
     }
 
     # Create client with kafka transport
