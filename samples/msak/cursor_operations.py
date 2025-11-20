@@ -65,6 +65,24 @@ def create_cursor_client(
     return client
 
 
+def check_connectivity(client: pubsublite_v1.CursorServiceClient):
+    """Check connectivity to Kafka broker."""
+    print("\nChecking connectivity to Kafka broker...")
+    try:
+        # Access underlying AdminClient (protected member)
+        if hasattr(client.transport, '_admin_client'):
+            admin_client = client.transport._admin_client
+            # Try to list topics with a timeout
+            metadata = admin_client.list_topics(timeout=10)
+            print(f"Successfully connected to broker.")
+            print(f"Found {len(metadata.topics)} topics.")
+        else:
+            print("Could not access underlying AdminClient for connectivity check.")
+    except Exception as e:
+        print(f"WARNING: Connectivity check failed: {e}")
+        print("Ensure you have network access to the bootstrap servers and valid credentials.")
+
+
 def commit_cursor(
     client: pubsublite_v1.CursorServiceClient,
     project_id: str,
@@ -142,6 +160,9 @@ def demo_cursor_operations(
     """
     print(f"Creating CursorServiceClient for Kafka...")
     client = create_cursor_client(bootstrap_servers)
+
+    # Check connectivity first
+    check_connectivity(client)
 
     try:
         # Commit a cursor
