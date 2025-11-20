@@ -36,11 +36,15 @@ logging.basicConfig(
 
 def create_cursor_client(
     bootstrap_servers: str = "localhost:9092",
+    topic: str = None,
+    group_id: str = None,
 ) -> pubsublite_v1.CursorServiceClient:
     """Create CursorServiceClient with Kafka transport.
 
     Args:
         bootstrap_servers: Kafka bootstrap servers
+        topic: Optional explicit topic
+        group_id: Optional explicit consumer group ID
 
     Returns:
         CursorServiceClient configured for Kafka
@@ -54,9 +58,18 @@ def create_cursor_client(
         'oauth_cb': token_provider.get_token,
         'debug': 'security,broker,protocol', 
     }
+    
+    if topic:
+        kafka_config['topic'] = topic
+    if group_id:
+        kafka_config['group.id'] = group_id
 
     # Create client with kafka transport
     print(f"Connecting to Kafka cluster: {bootstrap_servers}")
+    if topic:
+        print(f"  Default Topic: {topic}")
+    if group_id:
+        print(f"  Default Group: {group_id}")
     
     client = pubsublite_v1.CursorServiceClient(
         transport="kafka",
@@ -150,6 +163,7 @@ def demo_cursor_operations(
     location: str = "us-central1",
     subscription_id: str = "test-group",
     partition: int = 0,
+    topic: str = None,
 ):
     """Demonstrate cursor operations.
 
@@ -159,9 +173,15 @@ def demo_cursor_operations(
         location: Cloud location
         subscription_id: Subscription ID (Consumer Group ID)
         partition: Partition to commit to
+        topic: Kafka topic name (optional)
     """
     print(f"Creating CursorServiceClient for Kafka...")
-    client = create_cursor_client(bootstrap_servers)
+    # Pass explicit config if provided
+    client = create_cursor_client(
+        bootstrap_servers, 
+        topic=topic, 
+        group_id=subscription_id, # Use subscription_id as group_id
+    )
 
     # Check connectivity first
     check_connectivity(client)
@@ -223,7 +243,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--subscription-id",
-        default="testtopic",
+        default="pubsublite-testtopic-p2,
         help="Subscription ID (Consumer Group ID)"
     )
     parser.add_argument(
@@ -231,6 +251,12 @@ if __name__ == "__main__":
         type=int,
         default=2,
         help="Partition number"
+    )
+
+    parser.add_argument(
+        "--topic",
+        default="testtopic",
+        help="Kafka topic name"
     )
 
     args = parser.parse_args()
@@ -241,4 +267,5 @@ if __name__ == "__main__":
         location=args.location,
         subscription_id=args.subscription_id,
         partition=args.partition,
+        topic=args.topic,
     )

@@ -60,7 +60,9 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         """Initialize Kafka transport.
 
         Args:
-            kafka_config: Dict with Kafka config (must include 'bootstrap.servers').
+            kafka_config: Dict with Kafka config.
+                          Can include 'topic', 'group.id', 'partition' to override request values.
+                          Must include 'bootstrap.servers'.
             credentials: Google Cloud credentials.
             **kwargs: Additional arguments passed to base transport.
         """
@@ -70,12 +72,20 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 "Install with: pip install confluent-kafka"
             )
 
-        self._kafka_config = kafka_config or {}
+        # Process kafka_config
+        self._kafka_config = kafka_config.copy() if kafka_config else {}
+        
         if 'bootstrap.servers' not in self._kafka_config:
             raise ValueError(
                 "kafka_config must contain 'bootstrap.servers'. "
                 "Example: kafka_config={'bootstrap.servers': 'localhost:9092'}"
             )
+
+        # Extract explicit overrides
+        self._default_topic = self._kafka_config.pop('topic', None)
+        # self._default_partition = self._kafka_config.pop('partition', None) # Removed per user request
+        self._default_group_id = self._kafka_config.get('group.id') # Keep group.id in config for AdminClient? 
+        # AdminClient doesn't strictly need group.id but it doesn't hurt.
 
         # Create Kafka AdminClient
         self._admin_client = AdminClient(self._kafka_config)
@@ -115,73 +125,50 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         """Return callable for commit_cursor operation."""
         if "commit_cursor" not in self._stubs:
             def _commit_cursor(request: cursor.CommitCursorRequest, **kwargs) -> cursor.CommitCursorResponse:
-                group_id = self._extract_subscription_name(request.subscription)
+                # Determine Group ID
+                if self._default_group_id:
+                    group_id = self._default_group_id
+                else:
+                    group_id = self._extract_subscription_name(request.subscription)
+                
+                # Determine Partition
+                # Always use request partition
                 partition = request.partition
+                    
                 offset = request.cursor.offset
                 
-                # We need the topic name. In PSL, Subscription implies Topic.
-                # But here we don't have the mapping.
-                # Limitation: We assume the user provides the topic in the subscription name 
-                # OR we have to look it up (expensive).
-                # For now, let's assume the subscription name IS the topic name (common in simple setups)
-                # OR we fail if we can't derive it.
-                # Actually, we can try to list consumer groups to see if it exists and what it's consuming?
-                # No, that's too slow.
+                # Determine Topic
+                target_topic = None
                 
-                # WORKAROUND: We'll assume the subscription name format contains the topic 
-                # or we just use the subscription name as the group ID and hope the user 
-                # configured the consumer to use that group ID and topic.
-                # But to commit, we NEED the topic name for TopicPartition.
-                
-                # Let's try to fetch the topic from the subscription path if possible?
-                # No, the request only has subscription path.
-                
-                # If we can't get the topic, we can't commit.
-                # However, if we assume the subscription was created via our AdminClient,
-                # maybe we can store metadata? No state here.
-                
-                # Let's check if we can get the topic from the subscription name if it follows a pattern?
-                # Default PSL pattern: .../subscriptions/sub-id
-                
-                # CRITICAL ISSUE: We need the topic name to commit an offset in Kafka.
-                # Option 1: Require subscription name to be "topic-group" or similar?
-                # Option 2: Look up subscription (consumer group) to see what it's consuming.
-                #           But a group can consume multiple topics.
-                
-                # Let's try Option 2: Describe the group.
-                future = self._admin_client.list_consumer_group_offsets(
-                    [ConsumerGroupTopicPartitions(group_id)]
-                )
-                try:
-                    result = future[group_id].result()
-                    # result is ConsumerGroupTopicPartitions
-                    # It contains a list of TopicPartitions.
-                    # We need to find the one with the matching partition.
-                    
-                    target_topic = None
-                    for tp in result.topic_partitions:
-                        if tp.partition == partition:
-                            target_topic = tp.topic
-                            break
-                    
-                    if not target_topic:
-                        # If group has no offsets yet, we can't know the topic.
-                        # This is a blocker for "first commit".
-                        raise ValueError(
-                            f"Cannot determine topic for subscription {group_id} and partition {partition}. "
-                            "Ensure the consumer group has committed offsets at least once."
-                        )
-                        
-                except Exception as e:
-                     raise ValueError(f"Failed to resolve topic for subscription: {e}")
+                # Strategy 0: Explicit Topic in Config
+                if self._default_topic:
+                    target_topic = self._default_topic
+                # Strategy 1: Naming Convention "topic+group"
+                elif '+' in group_id:
+                    target_topic, group_id = group_id.split('+', 1)
+                else:
+                    # Strategy 2: Lookup existing offsets (Fallback)
+                    future = self._admin_client.list_consumer_group_offsets(
+                        [ConsumerGroupTopicPartitions(group_id)]
+                    )
+                    try:
+                        result = future[group_id].result()
+                        for tp in result.topic_partitions:
+                            if tp.partition == partition:
+                                target_topic = tp.topic
+                                break
+                    except Exception as e:
+                        raise ValueError(f"Failed to resolve topic for subscription '{group_id}': {e}")
 
-                # Now commit the new offset
-                # Note: PSL cursor offset is "next offset to read" (exclusive)? 
-                # Or "last read offset"?
-                # PSL: Cursor.offset is the offset of the message.
-                # Kafka: Committed offset is the NEXT message to read.
-                # So if PSL says "I processed offset X", we should commit X + 1.
-                
+                    if not target_topic:
+                        raise ValueError(
+                            f"Cannot determine topic for subscription '{group_id}' and partition {partition}. "
+                            "Please provide 'topic' in kafka_config, use 'topic+group' naming, "
+                            "or ensure the consumer group has committed offsets at least once."
+                        )
+
+                # Commit the offset
+                # PSL Cursor (last processed) -> Kafka Offset (next to read)
                 kafka_offset = offset + 1
                 
                 tp = TopicPartition(target_topic, partition, kafka_offset)
