@@ -93,6 +93,13 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
             **kwargs
         )
 
+        # Initialize wrapped methods
+        self._wrapped_methods = {
+            self.commit_cursor: self.commit_cursor,
+            self.list_partition_cursors: self.list_partition_cursors,
+            self.streaming_commit_cursor: self.streaming_commit_cursor,
+        }
+
     def _extract_subscription_name(self, path: str) -> str:
         """Extract subscription name (consumer group ID) from path."""
         return path.split('/')[-1]
