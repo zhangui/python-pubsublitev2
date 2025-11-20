@@ -186,7 +186,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--bootstrap-servers",
-        default="localhost:9092",
+        default="bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092",
         help="Kafka bootstrap servers"
     )
     parser.add_argument(
@@ -201,13 +201,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--subscription-id",
-        default="test-group",
+        default="testtopic",
         help="Subscription ID (Consumer Group ID)"
     )
     parser.add_argument(
         "--partition",
         type=int,
-        default=0,
+        default=2,
         help="Partition number"
     )
 
