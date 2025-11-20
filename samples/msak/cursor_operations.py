@@ -26,6 +26,7 @@ import logging
 import time
 from google.cloud import pubsublite_v1
 from google.cloud.pubsublite_v1.types import cursor, common
+from tokenprovider import TokenProvider
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,11 +48,9 @@ def create_cursor_client(
     # Create kafka config
     kafka_config = {
         'bootstrap.servers': bootstrap_servers,
-        # Add SASL/SSL config if needed, but for this sample we might assume local or simple auth
-        # For MSAK, we usually need SASL_SSL. 
-        # But since admin_operations.py used 'cluster_id' (Control Plane), 
-        # and we are using Data Plane, we need the actual bootstrap address.
-        # We'll accept it as an arg.
+        'security.protocol': 'SASL_SSL',
+        'sasl.mechanisms': 'OAUTHBEARER',
+        'oauth_cb': TokenProvider().get_token,
     }
 
     # Create client with kafka transport
