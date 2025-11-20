@@ -48,7 +48,7 @@ def create_cursor_client(
     # Create kafka config
     # token_provider = TokenProvider()
     kafka_config = {
-        'cluster_id': cluster_id,
+        'cluster_id': 'testpsl',
     }
 
     # Create client with kafka transport
