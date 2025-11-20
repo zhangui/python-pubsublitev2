@@ -49,10 +49,10 @@ def create_cursor_client(
     token_provider = TokenProvider()
     kafka_config = {
         'bootstrap.servers': bootstrap_servers,
-        # 'security.protocol': 'SASL_SSL',
-        # 'sasl.mechanisms': 'OAUTHBEARER',
-        # 'oauth_cb': token_provider.get_token,
-        # 'debug': 'security,broker,protocol', 
+        'security.protocol': 'SASL_SSL',
+        'sasl.mechanisms': 'OAUTHBEARER',
+        'oauth_cb': token_provider.get_token,
+        'debug': 'security,broker,protocol', 
     }
 
     # Create client with kafka transport
