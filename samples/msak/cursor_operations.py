@@ -151,7 +151,7 @@ def demo_cursor_operations(
         # If this is a fresh group, it might fail if we can't determine the topic.
         # But for a demo, we assume it might work if the group exists.
         
-        offset = 100
+        offset = 2
         commit_cursor(client, project_id, location, subscription_id, partition, offset)
 
         # Wait for propagation
