@@ -150,11 +150,17 @@ class SubscriberServiceKafkaTransport(SubscriberServiceTransport):
                         )
                         from google.cloud.pubsublite.types import FlowControlSettings
 
+                        # Determine consumer group
+                        # If group.id is provided in config, use it (allows standard Kafka balancing)
+                        # Otherwise, default to partition-specific group (PSL style)
+                        configured_group = self._consumer_config.get('group.id')
+                        consumer_group = configured_group if configured_group else f"pubsublite-{topic_name}-p{partition}"
+
                         # Create subscriber with consumer config
                         kafka_sub = AsyncKafkaSubscriber(
                             kafka_config=self._consumer_config,
                             topic_name=topic_name,
-                            consumer_group=f"pubsublite-{topic_name}-p{partition}",
+                            consumer_group=consumer_group,
                             flow_control_settings=FlowControlSettings(
                                 messages_outstanding=1000,
                                 bytes_outstanding=10 * 1024 * 1024,  # 10MB

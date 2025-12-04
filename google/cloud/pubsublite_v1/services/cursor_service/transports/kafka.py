@@ -190,15 +190,33 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
         """Return callable for list_partition_cursors operation."""
         if "list_partition_cursors" not in self._stubs:
             def _list_partition_cursors(request: cursor.ListPartitionCursorsRequest, **kwargs) -> cursor.ListPartitionCursorsResponse:
-                group_id = self._extract_subscription_name(request.parent)
+                # Determine Group ID
+                if self._default_group_id:
+                    group_id = self._default_group_id
+                else:
+                    group_id = self._extract_subscription_name(request.parent)
+                
+                # Determine Topic (for filtering)
+                target_topic = None
+                if self._default_topic:
+                    target_topic = self._default_topic
+                elif '+' in group_id:
+                    target_topic, group_id = group_id.split('+', 1)
                 
                 future = self._admin_client.list_consumer_group_offsets(
                     [ConsumerGroupTopicPartitions(group_id)]
                 )
-                result = future[group_id].result()
+                try:
+                    result = future[group_id].result()
+                except Exception as e:
+                    raise ValueError(f"Failed to list offsets for group '{group_id}': {e}")
                 
                 partition_cursors = []
                 for tp in result.topic_partitions:
+                    # Filter by topic if known
+                    if target_topic and tp.topic != target_topic:
+                        continue
+                        
                     # Convert Kafka offset (next to read) back to PSL cursor (last read)
                     # PSL Cursor = Kafka Offset - 1
                     if tp.offset >= 0:
@@ -232,9 +250,45 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 if not first_req.initial:
                     raise ValueError("First request must be initial")
                 
-                # We can't keep a persistent connection easily with AdminClient,
-                # so we'll just process each commit request individually.
+                # Determine Group ID (from config or initial request)
+                if self._default_group_id:
+                    group_id = self._default_group_id
+                else:
+                    group_id = self._extract_subscription_name(first_req.initial.subscription)
+
+                # Determine Partition (from initial request)
+                partition = first_req.initial.partition
                 
+                # Determine Topic (once for the stream)
+                target_topic = None
+                
+                # Strategy 0: Explicit Topic in Config
+                if self._default_topic:
+                    target_topic = self._default_topic
+                # Strategy 1: Naming Convention "topic+group"
+                elif '+' in group_id:
+                    target_topic, group_id = group_id.split('+', 1)
+                else:
+                    # Strategy 2: Lookup existing offsets (Fallback)
+                    # Try to resolve topic once
+                    future = self._admin_client.list_consumer_group_offsets(
+                        [ConsumerGroupTopicPartitions(group_id)]
+                    )
+                    try:
+                        result = future[group_id].result()
+                        for tp in result.topic_partitions:
+                            if tp.partition == partition:
+                                target_topic = tp.topic
+                                break
+                    except Exception as e:
+                        logger.warning(f"Failed to resolve topic for subscription '{group_id}': {e}")
+
+                if not target_topic:
+                     # If we still don't have a topic, we can't commit.
+                     # But maybe the user will provide it later? No, stream is established.
+                     # We'll log a warning and fail on individual commits if we can't resolve it.
+                     pass
+
                 # Yield initial response
                 yield cursor.StreamingCommitCursorResponse(
                     initial=cursor.InitialCommitCursorResponse()
@@ -242,58 +296,30 @@ class CursorServiceKafkaTransport(CursorServiceTransport):
                 
                 for req in req_iter:
                     if req.commit:
-                        # Reuse the logic from commit_cursor (simplified)
-                        # Note: This will be slow for high throughput as it makes an Admin API call per commit.
-                        # But it's functional.
-                        
-                        # We need to reconstruct a CommitCursorRequest-like object or just call logic directly
-                        # But wait, streaming request doesn't have Subscription in every message, only in Initial.
-                        
-                        group_id = self._extract_subscription_name(first_req.initial.subscription)
-                        partition = first_req.initial.partition
-                        offset = req.commit.cursor.offset
-                        
-                        # Resolve topic (cached from initial lookup?)
-                        # TODO: Cache topic resolution
-                        
-                        # For now, implementing full logic here is complex.
-                        # We'll just acknowledge without doing anything for this MVP step
-                        # OR try to implement it properly.
-                        
-                        # Let's try to implement properly with topic lookup once.
-                        if not hasattr(self, '_cached_topics'):
-                            self._cached_topics = {}
-                            
-                        cache_key = f"{group_id}:{partition}"
-                        target_topic = self._cached_topics.get(cache_key)
-                        
                         if not target_topic:
-                            # Resolve topic
-                            future = self._admin_client.list_consumer_group_offsets(
-                                [ConsumerGroupTopicPartitions(group_id)]
+                             # Try one last time or fail
+                             raise ValueError(
+                                f"Cannot determine topic for subscription '{group_id}' and partition {partition}. "
+                                "Please provide 'topic' in kafka_config, use 'topic+group' naming, "
+                                "or ensure the consumer group has committed offsets at least once."
                             )
-                            result = future[group_id].result()
-                            for tp in result.topic_partitions:
-                                if tp.partition == partition:
-                                    target_topic = tp.topic
-                                    self._cached_topics[cache_key] = target_topic
-                                    break
+
+                        offset = req.commit.cursor.offset
+                        kafka_offset = offset + 1
                         
-                        if target_topic:
-                            kafka_offset = offset + 1
-                            tp = TopicPartition(target_topic, partition, kafka_offset)
-                            group_tp = ConsumerGroupTopicPartitions(group_id, [tp])
-                            fs = self._admin_client.alter_consumer_group_offsets([group_tp])
-                            fs[group_id].result()
-                            
-                            yield cursor.StreamingCommitCursorResponse(
-                                commit=cursor.SequencedCommitCursorResponse(
-                                    acknowledged_commits=1 
-                                )
+                        tp = TopicPartition(target_topic, partition, kafka_offset)
+                        group_tp = ConsumerGroupTopicPartitions(group_id, [tp])
+                        
+                        # Note: This is still one API call per commit. 
+                        # Optimization (batching) is left for future work as per plan.
+                        fs = self._admin_client.alter_consumer_group_offsets([group_tp])
+                        fs[group_id].result()
+                        
+                        yield cursor.StreamingCommitCursorResponse(
+                            commit=cursor.SequencedCommitCursorResponse(
+                                acknowledged_commits=1 
                             )
-                        else:
-                             # Fail or ignore?
-                             logger.error(f"Could not resolve topic for {group_id}:{partition}")
+                        )
 
             self._stubs["streaming_commit_cursor"] = _streaming_commit_cursor
 

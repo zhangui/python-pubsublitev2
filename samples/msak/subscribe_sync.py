@@ -213,7 +213,7 @@ def subscribe_messages_kafka(
         subscription_name: Subscription/topic name
         project_id: Google Cloud project ID
         location: Cloud location
-        partition: Partition to subscribe to
+        partition: Partition to subscribe to (ignored if consumer_group is set)
         consumer_group: Consumer group ID (optional)
         duration_seconds: How long to run (0 = indefinite)
     """
@@ -241,7 +241,7 @@ if __name__ == "__main__":
     parser.add_argument("--subscription", default="testtopic", help="Subscription/topic name")
     parser.add_argument("--project-id", default="ygnahz-eg-codelab", help="Google Cloud project ID")
     parser.add_argument("--location", default="us-central1", help="Cloud location")
-    parser.add_argument("--partition", type=int, default=2, help="Partition to subscribe from")
+    parser.add_argument("--partition", type=int, default=0, help="Partition to subscribe from (default 0)")
     parser.add_argument("--consumer-group", help="Consumer group ID (optional)")
     parser.add_argument(
         "--duration",
