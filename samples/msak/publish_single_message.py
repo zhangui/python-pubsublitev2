@@ -98,7 +98,7 @@ def publish_single_message(
             )
             
             # Wait for acknowledgment
-            ack_id = future.result(timeout=30)
+            ack_id = future.result(timeout=6)
             print(f"✓ Message published successfully!")
             print(f"  Ack ID: {ack_id}")
             
