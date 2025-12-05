@@ -26,7 +26,7 @@ mtls_config={
     'ssl.keystore.password': 'keystorepass',
 }
 
-producer = confluent_kafka.Producer(mtls_config)
+producer = confluent_kafka.Producer(config)
 
 def callback(error, message):
     if error is not None:
