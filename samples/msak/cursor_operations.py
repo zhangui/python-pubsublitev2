@@ -243,7 +243,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--subscription-id",
-        default="pubsublite-testtopic-p2,
+        default="pubsublite-testtopic-p2",
         help="Subscription ID (Consumer Group ID)"
     )
     parser.add_argument(

@@ -177,22 +177,22 @@ def main():
     )
     parser.add_argument(
         "--project-id",
-        required=True,
+        default="ygnahz-eg-codelab",
         help="Google Cloud project ID"
     )
     parser.add_argument(
         "--location",
-        required=True,
+        default="us-central1",
         help="Google Cloud location (e.g., us-central1-a)"
     )
     parser.add_argument(
         "--topic-name",
-        required=True,
+        default="testtopic",
         help="Name of the Kafka topic"
     )
     parser.add_argument(
         "--bootstrap-servers",
-        required=True,
+        default="bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092",
         help="Comma-separated list of Kafka bootstrap servers"
     )
     parser.add_argument(

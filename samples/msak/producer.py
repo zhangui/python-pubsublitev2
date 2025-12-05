@@ -3,7 +3,7 @@ import argparse
 from tokenprovider import TokenProvider
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-b', '--bootstrap-servers', dest='bootstrap', type=str, required=True)
+parser.add_argument('-b', '--bootstrap-servers', dest='bootstrap', type=str, default="bootstrap.testpsl.us-central1.managedkafka.ygnahz-eg-codelab.cloud.goog:9092")
 parser.add_argument('-t', '--topic-name', dest='topic_name', type=str, default='testtopic', required=False)
 parser.add_argument('-n', '--num_messages', dest='num_messages', type=int, default=1, required=False)
 args = parser.parse_args()
